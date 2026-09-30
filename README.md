@@ -222,6 +222,28 @@ monotonicity, the Adversarial Agent never *increasing* confidence, forecasts
 pinned to model versions, contradictions preserving both claims, and hostile
 ingest payloads (including prompt-injection text) neutralized to inert data.
 
+## Implementation status — vision → code
+
+| Vision | Status |
+|---|---|
+| §5–6 Global state, Impact Cone (typed edges) | ✅ live UI + API |
+| §7–8 Competing hypotheses, Falsification Engine | ✅ |
+| §9 Contradiction Engine (lifecycle, evidence preserved) | ✅ resolves live |
+| §10 Outcome Ledger + calibration (Brier, reliability buckets) | ✅ resolves live |
+| §11 Watchpoints — **auto-evaluated**: evidence mechanically moves confidence, traceably | ✅ |
+| §12 Counterfactual simulation | ✅ |
+| §13–14 Multi-agent roster, Adversarial Agent | ✅ (deterministic agents) |
+| §15 Source reliability metadata | ✅ |
+| §16 Ingestion pipeline (zero-trust adapters, controlled failure) | ✅ USGS + Open-Meteo |
+| §21, §42 Evidence integrity / tamper-evident state | ✅ hash chain, 4 independent verifiers |
+| §22 Supply-chain security (SBOM, signing, provenance) | ✅ release workflow |
+| §24 API security (rate limits, keys, audit) | ✅ + hash-chained audit trail |
+| §25–26 Sandboxing / prompt-injection defense | ✅ data-never-instructions ingest, tested |
+| §43 Federation | ✅ protocol v0: signed bundles, learned trust (v0.3), cross-node review (v0.5) |
+| §44 SDK / adapters / schemas | ✅ Python + TypeScript SDKs, adapter API, SQL schema |
+| §45 Ethical boundary | ✅ decision support only; no autonomous actions anywhere |
+| LLM-backed extraction/forecasting agents, RBAC, PostGIS persistence | 🔜 next phase (schema & interfaces ready) |
+
 ## Tamper-evident analytical history (§21, §42)
 
 Every evidence record is appended to a hash chain:

@@ -109,7 +109,35 @@ class World:
         rec["content_hash"] = chained["hash"]
         rec["chain_seq"] = chained["seq"]
         self.evidence[eid] = rec
+        self._evaluate_watchpoints(rec)
         return rec
+
+    def _evaluate_watchpoints(self, rec: dict) -> None:
+        """Watchpoint engine (§11): every new evidence record is tested against
+        the watchpoints of every active hypothesis. Matches mechanically move
+        confidence and attach the evidence — supporting when the effect is
+        positive, contradicting when negative. No human, no LLM, no narrative:
+        the loop closes itself and every adjustment is traceable to a hit."""
+        stmt = rec["statement"].lower()
+        for h in self.hypotheses.values():
+            if h.get("status") != "active":
+                continue
+            for wp in h.get("watchpoints", []):
+                kws = wp.get("keywords")
+                if not kws or not all(k in stmt for k in kws):
+                    continue
+                hits = wp.setdefault("hits", [])
+                if any(x["evidence_id"] == rec["id"] for x in hits):
+                    continue
+                delta = wp.get("effect", 0.0)
+                hits.append({"evidence_id": rec["id"], "at": rec["observed_at"],
+                             "delta": delta})
+                h["confidence"] = round(min(0.97, max(0.03, h["confidence"] + delta)), 2)
+                if delta >= 0:
+                    if rec["id"] not in h["evidence_ids"]:
+                        h["evidence_ids"].append(rec["id"])
+                elif rec["id"] not in h["counter_evidence_ids"]:
+                    h["counter_evidence_ids"].append(rec["id"])
 
     # -- static world -------------------------------------------------------
 
@@ -411,9 +439,12 @@ class World:
                     "AIS anchorage density returns to baseline while alerts persist.",
                 ],
                 "watchpoints": [
-                    {"id": "wp_1", "label": "Vessel dwell time at Visakhapatnam", "signal": "AIS", "direction": "↑ expected"},
-                    {"id": "wp_2", "label": "Port throughput (TEU/day)", "signal": "port feed", "direction": "↓ expected"},
-                    {"id": "wp_3", "label": "NH-16 closure notices", "signal": "official", "direction": "issue expected"},
+                    {"id": "wp_1", "label": "Vessel dwell time at Visakhapatnam", "signal": "AIS", "direction": "↑ expected",
+                     "keywords": ["visakhapatnam", "dwell"], "effect": 0.05, "hits": []},
+                    {"id": "wp_2", "label": "Port throughput (TEU/day)", "signal": "port feed", "direction": "↓ expected",
+                     "keywords": ["visakhapatnam", "throughput"], "effect": 0.04, "hits": []},
+                    {"id": "wp_3", "label": "NH-16 closure notices", "signal": "official", "direction": "issue expected",
+                     "keywords": ["nh-16", "closure"], "effect": 0.03, "hits": []},
                     {"id": "wp_4", "label": "Grid restoration rate", "signal": "TSO telemetry", "direction": "recovery curve"},
                     {"id": "wp_5", "label": "Independent media corroboration", "signal": "news", "direction": "≥2 outlets"},
                 ],
@@ -452,7 +483,8 @@ class World:
                     "Historical baseline check shows no seasonal congestion anomaly.",
                 ],
                 "watchpoints": [
-                    {"id": "wp_8", "label": "Pre-storm congestion baseline (4-week)", "signal": "derived", "direction": "recompute"},
+                    {"id": "wp_8", "label": "Pre-storm congestion baseline (4-week)", "signal": "derived", "direction": "recompute",
+                     "keywords": ["visakhapatnam", "dwell"], "effect": -0.06, "hits": []},
                 ],
                 "status": "active",
             },
@@ -470,7 +502,8 @@ class World:
                     "Other transshipment hubs show identical dwell rise without bunching.",
                 ],
                 "watchpoints": [
-                    {"id": "wp_9", "label": "Arrival bunching index", "signal": "AIS", "direction": "↓ expected"},
+                    {"id": "wp_9", "label": "Arrival bunching index", "signal": "AIS", "direction": "↓ expected",
+                     "keywords": ["bunching index"], "effect": 0.05, "hits": []},
                     {"id": "wp_10", "label": "Dwell time decay slope", "signal": "port feed", "direction": "↓ within 14 d"},
                 ],
                 "status": "active",
@@ -508,6 +541,8 @@ class World:
                 "watchpoints": [
                     {"id": "wp_12", "label": "Reserve margin per zone", "signal": "TSO", "direction": "monitor"},
                     {"id": "wp_13", "label": "Interconnector restoration", "signal": "official", "direction": "monitor"},
+                {"id": "wp_16", "label": "Cold anomaly forecast revisions", "signal": "weather_model",
+                 "direction": "↓ risk if moderation", "keywords": ["moderation"], "effect": -0.09, "hits": []},
                 ],
                 "status": "active",
             },
@@ -525,8 +560,10 @@ class World:
                     "Queue stabilizes under 6 days (re-routing threshold never crossed).",
                 ],
                 "watchpoints": [
-                    {"id": "wp_14", "label": "Gatún Lake level", "signal": "hydrology gauge", "direction": "monitor"},
-                    {"id": "wp_15", "label": "Booking share Suez vs Panama", "signal": "carrier data", "direction": "shift expected"},
+                    {"id": "wp_14", "label": "Gatún Lake level", "signal": "hydrology gauge", "direction": "monitor",
+                     "keywords": ["gatún", "unchanged"], "effect": 0.03, "hits": []},
+                    {"id": "wp_15", "label": "Booking share Suez vs Panama", "signal": "carrier data", "direction": "shift expected",
+                     "keywords": ["suez routing"], "effect": 0.04, "hits": []},
                 ],
                 "status": "active",
             },
@@ -723,18 +760,8 @@ class World:
                 self._resolve_forecast(f)
 
     def _apply_stream_effects(self, eid: str, stmt: str) -> None:
-        # dwell observation strengthens hyp_442, weakens hyp_444
-        if eid.endswith(str(self.obs_counter)) and "dwell +43%" in stmt:
-            self.hypotheses["hyp_442"]["evidence_ids"].append(eid)
-            self.hypotheses["hyp_442"]["confidence"] = 0.79
-            self.hypotheses["hyp_444"]["counter_evidence_ids"].append(eid)
-            self.hypotheses["hyp_444"]["confidence"] = 0.12
-        if "NH-16: pre-emptive closure" in stmt:
-            self.hypotheses["hyp_442"]["evidence_ids"].append(eid)
-            self.hypotheses["hyp_442"]["confidence"] = 0.82
-        if "bunching index declines" in stmt:
-            self.hypotheses["hyp_451"]["evidence_ids"].append(eid)
-            self.hypotheses["hyp_451"]["confidence"] = 0.71
+        # confidence movement is owned by the watchpoint engine (§11);
+        # this hook only advances contradiction lifecycles
         if "fuel infrastructure exempt" in stmt:
             c = self.contradictions["conflict_1043"]
             if c["status"] == "UNRESOLVED":
@@ -742,7 +769,6 @@ class World:
                 c["resolution_note"] = ("Grid operator confirmation + no independent outage reports. "
                                         "Claim A (social cluster) assessed FALSE; original evidence preserved.")
         if "moderation begins" in stmt:
-            self.hypotheses["hyp_461"]["confidence"] = 0.36
             c = self.contradictions["conflict_1039"]
             if c["status"] == "UNRESOLVED":
                 c["status"] = "PARTIALLY_RESOLVED"

@@ -160,17 +160,22 @@ function renderEventList() {
 /* ---------------- federation (SYNTHESIS Protocol v0) ---------------- */
 async function refreshFederation() {
   try {
-    const f = await api("/api/federation/status");
+    const [f, rev] = await Promise.all([api("/api/federation/status"), api("/api/federation/reviews")]);
     const id = f.identity;
     $("#fedStatus").innerHTML =
       `<div class="fednode">this node: <b>${esc(id.name)}</b> · id ${esc(id.node_id)} · ${esc(id.protocol)}<br>pubkey ${esc(id.pubkey.slice(0, 24))}…</div>` +
       (f.peers.length
         ? f.peers.map((p) => `<div class="fedpeer ${p.reachable === false ? "down" : ""}">
             <b>${esc(p.name || p.url)}</b> ${p.node_id ? `<span class="meta">id ${esc(p.node_id)}</span>` : ""}
-            <div class="meta">${p.reachable === false ? "unreachable" : "signature verified ✓"} · trust ${p.trust} (learned) · imported ${p.imported_new} · corroborated ${p.corroborated} · rejected ${p.rejected} · outcomes ${p.outcome_hits}✓/${p.outcome_misses}✗${p.last_sync ? " · sync " + esc(p.last_sync) : ""}</div>
+            <div class="meta">${p.reachable === false ? "unreachable" : "signature verified ✓"} · trust ${p.trust} (learned) · imported ${p.imported_new} · corroborated ${p.corroborated} · rejected ${p.rejected} · outcomes ${p.outcome_hits}✓/${p.outcome_misses}✗ · hyps reviewed ${p.hyps_reviewed}${p.last_sync ? " · sync " + esc(p.last_sync) : ""}</div>
             ${p.last_error ? `<div class="meta">${esc(p.last_error)}</div>` : ""}
           </div>`).join("")
         : '<div class="muted" style="font-size:12px">No peers yet. Run a second node and peer it — matching claims become corroboration, new claims enter the chain with federated provenance.</div>') +
+      (rev.reviews.length ? `<div class="kv" style="margin-top:8px"><h4>Cross-node adversarial reviews (v0.5)</h4>` +
+        rev.reviews.slice(0, 3).map((r) => `<div class="fedpeer" style="border-left-color:${r.verdict === "REJECTED" ? "var(--red)" : r.verdict === "FLAGGED" ? "var(--amber)" : "var(--teal)"}">
+          <b>${esc(r.hypothesis_id)}</b> from ${esc(r.peer_name)} · peer conf ${Math.round(r.peer_confidence * 100)}% · <b>${esc(r.verdict)}</b>
+          ${r.notes.length ? `<div class="meta">${r.notes.map(esc).join(" · ")}</div>` : ""}
+        </div>`).join("") + `</div>` : "") +
       `<div class="fedprinciple">${esc(f.principle)}</div>`;
   } catch (e) {}
 }
@@ -344,7 +349,11 @@ async function selectHyp(hid, scroll = true) {
     <div class="kv"><h4>Mechanism</h4><ul>${h.mechanism.map((m) => `<li>${esc(m)}</li>`).join("")}</ul></div>
     <div class="kv"><h4>Assumptions</h4><ul>${h.assumptions.map((a) => `<li>${esc(a)}</li>`).join("")}</ul></div>
     <div class="kv"><h4>Falsifiers — what would prove this wrong</h4><ul>${h.falsifiers.map((f) => `<li>✕ ${esc(f)}</li>`).join("")}</ul></div>
-    <div class="kv"><h4>Watchpoints</h4><ul>${h.watchpoints.map((w) => `<li><b>${esc(w.label)}</b> · ${esc(w.signal)} · ${esc(w.direction)}</li>`).join("")}</ul></div>`;
+    <div class="kv"><h4>Watchpoints (auto-evaluated §11)</h4><ul>${h.watchpoints.map((w) => {
+      const hits = (w.hits || []).length;
+      const last = hits ? w.hits[w.hits.length - 1] : null;
+      return `<li><b>${esc(w.label)}</b> · ${esc(w.signal)} · ${esc(w.direction)}${hits ? ` — <span style="color:${last.delta >= 0 ? "var(--teal)" : "var(--red)"}">${hits} hit${hits > 1 ? "s" : ""} (${last.delta >= 0 ? "+" : ""}${last.delta} conf, ${esc(last.evidence_id)})</span>` : ""}</li>`;
+    }).join("")}</ul></div>`;
   bindEvidenceChips($("#hypDetail"));
   if (scroll) $("#hypDetail").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }

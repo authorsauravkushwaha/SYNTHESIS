@@ -118,7 +118,28 @@ A neutral peer's imports are discounted ×0.95; a hostile peer decays toward
 ×0.65; a consistently corroborated peer caps at ×0.98 — federated evidence
 can never quite reach first-hand reliability.
 
-## 7. Roadmap
+## 7. Hypothesis exchange & cross-node review (v0.5 — implemented)
 
-- v0.4: bundle pagination + since-cursor; per-observation origin signatures
-- v0.5: exchange of hypotheses/forecasts/outcomes under the same envelope
+`GET /api/federation/hypotheses` returns a signed bundle (`"kind": "hypotheses"`)
+of active hypotheses — claims with confidence, evidence counts and
+**falsifiers**. The receiver's obligations:
+
+1. verify signature before reading anything (same as observations);
+2. **never merge** peer hypotheses into the local world;
+3. run a local adversarial review of each one:
+   - no falsifiers → `REJECTED` ("UNFALSIFIABLE", §8);
+   - confidence > 0.8 on < 3 evidence items → `FLAGGED` ("OVERCONFIDENT");
+   - local confidence differs by > 0.15 on the same hypothesis →
+     `FLAGGED` ("CROSS-NODE DISAGREEMENT — disagreement between nodes is
+     information");
+   - otherwise `ACCEPTED FOR CONSIDERATION`;
+4. publish the reviews at `GET /api/federation/reviews`.
+
+Nodes therefore *debate* — each applies its own epistemic standards to the
+other's reasoning, and the debate is inspectable decision support.
+
+## 8. Roadmap
+
+- v0.6: bundle pagination + since-cursor; per-observation origin signatures
+- v0.7: forecast/outcome exchange under the same envelope; review responses
+  (a node may answer its reviewers with new evidence)

@@ -93,6 +93,21 @@ def federation_status():
     return NODE.status()
 
 
+@app.get("/api/federation/hypotheses")
+def federation_hypotheses():
+    """Signed bundle of active hypotheses (protocol v0.5) — shared as
+    claims-with-falsifiers for peer adversarial review, never as facts."""
+    return NODE.outbound_hypotheses()
+
+
+@app.get("/api/federation/reviews")
+def federation_reviews():
+    """Cross-node adversarial reviews this node performed on peer hypotheses."""
+    return {"reviews": NODE.reviews[::-1],
+            "principle": ("Peer hypotheses are never merged — they are reviewed. "
+                          "Disagreement between nodes is information.")}
+
+
 @app.post("/api/federation/peers")
 def federation_add_peer(req: PeerRequest):
     try:

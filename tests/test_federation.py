@@ -100,6 +100,46 @@ def test_outcome_ledger_reprices_peer_trust():
     assert peer.trust == round((1 + succ) / (2 + succ + fail), 3)
 
 
+def test_hypothesis_bundle_signed_and_reviewed():
+    """Protocol v0.5: peer hypotheses are reviewed, never merged."""
+    a, b = make_node(), make_node()
+    bundle = a.outbound_hypotheses()
+    ok, reason = verify_bundle(bundle)
+    assert ok, reason
+    assert bundle["kind"] == "hypotheses"
+    peer = PeerState(url="http://node-a.example", node_id="aaaa0000bbbb")
+    from server.world import WORLD
+    hyp_count = len(WORLD.hypotheses)
+    b.review_peer_hypotheses(bundle, peer)
+    assert peer.hyps_reviewed > 0
+    assert len(WORLD.hypotheses) == hyp_count          # nothing merged
+    assert all(r["verdict"] in ("ACCEPTED FOR CONSIDERATION", "FLAGGED", "REJECTED")
+               for r in b.reviews)
+
+
+def test_unfalsifiable_peer_hypothesis_rejected():
+    a, b = make_node(), make_node()
+    bundle = a.outbound_hypotheses()
+    # strip falsifiers from every hypothesis, then re-sign correctly
+    for h in bundle["hypotheses"]:
+        h["falsifiers"] = []
+    del bundle["signature"]
+    bundle["signature"] = a.identity.sign(canonical(bundle))
+    peer = PeerState(url="http://node-a.example")
+    b.review_peer_hypotheses(bundle, peer)
+    assert b.reviews and all(r["verdict"] == "REJECTED" for r in b.reviews)
+    assert any("UNFALSIFIABLE" in n for r in b.reviews for n in r["notes"])
+
+
+def test_tampered_hypothesis_bundle_never_reviewed():
+    a, b = make_node(), make_node()
+    bundle = a.outbound_hypotheses()
+    bundle["hypotheses"][0]["confidence"] = 0.99       # tamper after signing
+    peer = PeerState(url="http://evil.example")
+    b.review_peer_hypotheses(bundle, peer)
+    assert peer.hyps_reviewed == 0 and peer.rejected == 1
+
+
 def test_matching_claims_become_corroboration_not_duplicates():
     a = make_node()
     bundle = a.outbound_bundle()

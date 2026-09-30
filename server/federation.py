@@ -108,6 +108,7 @@ class PeerState:
     rejected: int = 0
     outcome_hits: int = 0       # v0.3: peer evidence backed a CORRECT forecast
     outcome_misses: int = 0     # v0.3: peer evidence backed a FAILED forecast
+    hyps_reviewed: int = 0      # v0.5: peer hypotheses adversarially reviewed here
     trust: float = 0.5          # learned — Beta-posterior mean, never asserted
     last_error: str | None = None
 
@@ -134,6 +135,7 @@ class FederationNode:
         self.peers: dict[str, PeerState] = {}
         self._imported: set[str] = set()          # (peer_id, statement) keys
         self._fed_seq = 0
+        self.reviews: list[dict] = []             # v0.5 cross-node reviews
         self._seed_local_observations()
         WORLD.outcome_listeners.append(self._on_outcome)   # protocol v0.3
 
@@ -193,6 +195,74 @@ class FederationNode:
         }
         bundle["signature"] = self.identity.sign(canonical(bundle))
         return bundle
+
+    def outbound_hypotheses(self, limit: int = 20) -> dict:
+        """Protocol v0.5: share active hypotheses so peers can run their own
+        adversarial review. Shared as claims-with-falsifiers, never as facts."""
+        WORLD.tick()
+        hyps = [h for h in WORLD.hypotheses.values() if h["status"] == "active"][:limit]
+        bundle = {
+            "protocol": PROTOCOL,
+            "kind": "hypotheses",
+            "node": self.identity.to_dict(),
+            "generated_at": iso(now()),
+            "hypotheses": [{
+                "id": h["id"], "event_id": h["event_id"], "label": h["label"],
+                "claim": h["claim"], "confidence": h["confidence"],
+                "evidence_count": len(h["evidence_ids"]),
+                "counter_evidence_count": len(h["counter_evidence_ids"]),
+                "falsifiers": h["falsifiers"],
+            } for h in hyps],
+        }
+        bundle["signature"] = self.identity.sign(canonical(bundle))
+        return bundle
+
+    def review_peer_hypotheses(self, bundle: dict, peer: PeerState) -> None:
+        """Cross-node adversarial review: this node's standards applied to a
+        peer's reasoning. Peer hypotheses are NEVER merged into the local
+        world — they are reviewed, and the review is decision support."""
+        ok, reason = verify_bundle(bundle)
+        if not ok:
+            peer.rejected += 1
+            peer.last_error = f"hypothesis bundle rejected: {reason}"
+            peer.learn_trust()
+            return
+        for ph in bundle.get("hypotheses", [])[:20]:
+            try:
+                hid = _clean_text(str(ph["id"]), 40)
+                claim = _clean_text(str(ph["claim"]), 300)
+                conf = _clamp(float(ph["confidence"]), 0.0, 1.0)
+                ev_n = int(_clamp(int(ph.get("evidence_count", 0)), 0, 10_000))
+                falsifiers = [_clean_text(str(f), 200) for f in ph.get("falsifiers", [])[:10]]
+                event_id = _clean_text(str(ph.get("event_id", "")), 40)
+            except (KeyError, TypeError, ValueError):
+                peer.rejected += 1
+                continue
+            key = f"rev|{peer.node_id}|{hid}"
+            if key in self._imported:
+                continue
+            self._imported.add(key)
+            notes = []
+            if not falsifiers:
+                notes.append("UNFALSIFIABLE: no falsification conditions stated — "
+                             "rejected from consideration (§8).")
+            if conf > 0.8 and ev_n < 3:
+                notes.append(f"OVERCONFIDENT: {int(conf*100)}% on {ev_n} evidence item(s).")
+            local = WORLD.hypotheses.get(hid)
+            if local and abs(local["confidence"] - conf) > 0.15:
+                notes.append(f"CROSS-NODE DISAGREEMENT: local confidence "
+                             f"{local['confidence']} vs peer {conf} on the same "
+                             "hypothesis — disagreement between nodes is information.")
+            verdict = ("REJECTED" if not falsifiers else
+                       "FLAGGED" if notes else "ACCEPTED FOR CONSIDERATION")
+            self.reviews.append({
+                "peer": peer.node_id, "peer_name": peer.name,
+                "hypothesis_id": hid, "event_id": event_id, "claim": claim,
+                "peer_confidence": conf, "verdict": verdict, "notes": notes,
+                "reviewed_at": iso(now()),
+            })
+            peer.hyps_reviewed += 1
+        del self.reviews[:-100]                       # keep the last 100
 
     # -- inbound ------------------------------------------------------------
     def ingest_bundle(self, bundle: dict, peer: PeerState) -> None:
@@ -254,9 +324,20 @@ class FederationNode:
             if len(raw) > MAX_BYTES:
                 raise ValueError("bundle exceeds size cap")
             self.ingest_bundle(json.loads(raw), peer)
+            # v0.5: also review the peer's hypotheses (older peers may not serve them)
+            try:
+                req_h = urllib.request.Request(
+                    peer.url + "/api/federation/hypotheses",
+                    headers={"User-Agent": f"SYNTHESIS-fed/{self.identity.node_id}"})
+                with urllib.request.urlopen(req_h, timeout=FETCH_TIMEOUT) as r:
+                    raw_h = r.read(MAX_BYTES + 1)
+                if len(raw_h) <= MAX_BYTES:
+                    self.review_peer_hypotheses(json.loads(raw_h), peer)
+            except Exception:
+                pass
             peer.reachable = True
             peer.last_sync = iso(now())
-            if not (peer.last_error or "").startswith("bundle rejected"):
+            if not (peer.last_error or "").startswith(("bundle rejected", "hypothesis bundle rejected")):
                 peer.last_error = None
         except Exception as exc:                      # controlled failure (§51)
             peer.reachable = False
