@@ -16,9 +16,11 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install pinned dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt pytest
       - name: Import & schema smoke test
         run: python -m compileall server && python -c "from server.world import WORLD; s=WORLD.global_state(); assert s['chain_length']>10"
+      - name: World-model invariants & zero-trust ingestion tests
+        run: python -m pytest tests/ -q
       - name: Build C ledger verifier
         run: gcc -O2 -Wall -Werror -o tools/ledgercheck/ledgercheck tools/ledgercheck/ledgercheck.c
       - name: Verify tamper-evident chain (C tool vs Python chain)

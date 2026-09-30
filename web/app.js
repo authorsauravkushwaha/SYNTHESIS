@@ -70,6 +70,18 @@ async function refreshFeed() {
   } catch (e) {}
 }
 
+async function refreshIngest() {
+  try {
+    const s = await api("/api/ingest/status");
+    $("#ingestStatus").innerHTML =
+      `<div style="margin-bottom:6px"><span class="status ${s.mode.startsWith("LIVE") ? "RESOLVED" : "PARTIALLY_RESOLVED"}">${esc(s.mode)}</span></div>` +
+      s.adapters.map((a) => `<div class="feeditem" style="border-left-color:${a.reachable ? "#22d3a5" : a.reachable === false ? "#ef4444" : "#64748b"}">
+        <span class="src">${esc(a.name)}</span> <span class="meta">${a.reachable ? "reachable · " + a.ingested + " ingested" : a.reachable === false ? "unreachable — degraded to simulation" : "not yet attempted"}</span>
+        ${a.last_error ? `<div class="meta">${esc(a.last_error)}</div>` : ""}
+      </div>`).join("");
+  } catch (e) {}
+}
+
 async function refreshEvents() {
   EVENTS = await api("/api/events");
   $("#eventList").innerHTML = EVENTS.map((ev) => `
@@ -82,6 +94,7 @@ async function refreshEvents() {
   document.querySelectorAll(".evrow").forEach((r) => r.addEventListener("click", () => openEvent(r.dataset.ev)));
   const sel = $("#eventSelect");
   sel.innerHTML = EVENTS.map((ev) => `<option value="${ev.id}">${esc(ev.title)}</option>`).join("");
+  if (selectedEvent) sel.value = selectedEvent;
   sel.onchange = () => openEvent(sel.value, false);
   if (!selectedEvent && EVENTS.length) loadEvent(EVENTS[0].id);
   drawMap();
@@ -387,8 +400,11 @@ async function boot() {
   await refreshEvents();
   await refreshFeed();
   loadGeo();
+  refreshIngest();
   setInterval(refreshState, 5000);
   setInterval(refreshFeed, 5000);
+  setInterval(refreshIngest, 20000);
+  setInterval(refreshEvents, 30000);   // pick up adapter-created events
   setInterval(() => { if ($("#tab-ledger").classList.contains("active")) refreshLedger(); }, 5000);
   setInterval(() => { if ($("#tab-contra").classList.contains("active")) refreshContradictions(); }, 8000);
 }

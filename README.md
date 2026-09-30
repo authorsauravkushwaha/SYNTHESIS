@@ -77,6 +77,46 @@ evidence freshness must never be silently faked from a cache.
 
 ---
 
+## Live data ingestion (Data Adapter API, §16/§44)
+
+`server/ingest.py` ships real public-data connectors — **USGS earthquakes**
+(M6+ auto-become events with templated causal cones & hypotheses) and
+**Open-Meteo wind** at watched coastal infrastructure — behind zero-trust rules:
+
+- payload size caps, schema allow-lists, range clamps, hard text truncation;
+- external content is stored strictly as **data, never instructions** (§26);
+- adapters can only **propose** observations — they cannot write world state;
+- unreachable sources are a *normal state* (§51): the platform degrades to
+  simulation-only and reports it honestly at `/api/ingest/status` and in the
+  **DATA ADAPTERS** panel, never crashes.
+
+## Python SDK (§44)
+
+```python
+# PYTHONPATH=sdk/python  (or: pip install -e sdk/python)
+from synthesis_sdk import SynthesisClient
+c = SynthesisClient("http://localhost:8000")
+hyp = c.hypotheses(c.events()[0]["id"])[0]
+print(c.challenge(hyp["id"])["verdict"])          # Adversarial Agent
+print(c.counterfactual(hyp["event_id"], 24)["narrative"])
+ok, n, head = c.verify_chain()                     # client-side, independent
+```
+
+Run the whole intelligence loop from code: `PYTHONPATH=sdk/python python3 sdk/python/example.py`
+
+## Tests
+
+```bash
+python -m pytest tests/ -q     # 17 tests
+```
+
+The suite enforces the vision's promises as invariants: chain validity &
+tamper detection, every hypothesis falsifiable with watchpoints, evidence
+metadata completeness, typed cone edges with stated mechanisms, counterfactual
+monotonicity, the Adversarial Agent never *increasing* confidence, forecasts
+pinned to model versions, contradictions preserving both claims, and hostile
+ingest payloads (including prompt-injection text) neutralized to inert data.
+
 ## Tamper-evident analytical history (§21, §42)
 
 Every evidence record is appended to a hash chain:
@@ -111,6 +151,10 @@ Each language does the job it is best at:
 | `web/app.js` | **JavaScript** | Ops-center client: world map, impact-cone SVG renderer, live feed, ledger |
 | `web/index.html`, `web/style.css` | **HTML / CSS** | Installable PWA shell |
 | `web/sw.js`, `web/manifest.webmanifest` | **JavaScript / JSON** | Offline shell + install on PC/mobile |
+| `server/ingest.py` | **Python** | Zero-trust live data adapters (USGS, Open-Meteo) with controlled failure |
+| `sdk/python/` | **Python** | Dependency-free SDK incl. client-side chain verification |
+| `tests/` | **Python / pytest** | World-model invariants + hostile-input ingestion tests |
+| `docs/VISION.md` | **Markdown** | The full 55-section vision document |
 | `db/schema.sql` | **SQL (PostgreSQL + PostGIS)** | Production-target schema for the full data model (§29–31) |
 | `tools/ledgercheck/ledgercheck.c` | **C** | Independent tamper-evidence verifier with embedded SHA-256 |
 | `scripts/*.sh` | **Bash** | Dev & verification workflows |
@@ -134,6 +178,7 @@ GET  /api/ledger/export              tamper-evident chain (TSV)
 GET  /api/calibration                reliability buckets, sector Brier
 POST /api/counterfactual             branch the causal model
 GET  /api/agents                     least-privilege agent roster
+GET  /api/ingest/status              live data adapter health (LIVE vs SIMULATION)
 ```
 
 Interactive docs at `/docs` (OpenAPI).

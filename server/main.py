@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .world import WORLD, MODEL_VERSION
+from .ingest import INGESTOR
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 
@@ -43,7 +44,20 @@ async def security_headers(request, call_next):
     return resp
 
 
+@app.on_event("startup")
+async def start_live_ingest():
+    import asyncio
+    asyncio.create_task(INGESTOR.run())
+
+
 # ---------------------------------------------------------------- API ----
+
+@app.get("/api/ingest/status")
+def ingest_status():
+    """Live Data Adapter status — LIVE when real sources are reachable,
+    SIMULATION ONLY otherwise (controlled failure, vision §51)."""
+    return INGESTOR.status()
+
 
 @app.get("/api/state")
 def state():
