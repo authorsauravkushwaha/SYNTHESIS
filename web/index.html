@@ -23,6 +23,7 @@
   <div class="topstats" id="topstats"></div>
   <div class="topactions">
     <span class="chainpill" id="chainpill" title="Tamper-evident evidence chain head (sha256)">chain —</span>
+    <button id="notifyBtn" class="btn ghost" title="Browser notifications for NEW EVENT DETECTED">🔔</button>
     <button id="installBtn" class="btn ghost hidden">⬇ Install app</button>
   </div>
 </header>
@@ -56,6 +57,14 @@
       <div class="panel">
         <div class="panel-title">DATA ADAPTERS <span class="sub">zero-trust ingestion — external content is data, never instructions</span></div>
         <div id="ingestStatus" class="muted">checking…</div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">FEDERATION <span class="sub">SYNTHESIS Protocol v0 — Ed25519-signed observation exchange (§43)</span></div>
+        <div id="fedStatus" class="muted">loading…</div>
+        <div class="fedadd">
+          <input id="peerUrl" type="text" placeholder="peer node url, e.g. http://localhost:8001">
+          <button class="btn" id="btnAddPeer">⇄ Peer</button>
+        </div>
       </div>
     </div>
   </section>
@@ -153,6 +162,7 @@
 </footer>
 
 <div id="modal" class="hidden"><div id="modalCard"><button id="modalClose">✕</button><div id="modalBody"></div></div></div>
+<div id="toasts"></div>
 
 <script src="/app.js"></script>
 </body>

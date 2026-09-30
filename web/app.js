@@ -102,8 +102,45 @@ async function refreshIngest() {
   } catch (e) {}
 }
 
+/* ---------------- toasts + NEW EVENT DETECTED notifications ---------------- */
+const knownEventIds = new Set();
+let eventsPrimed = false;
+
+function toast(head, body, cls = "", onclick = null) {
+  const el = document.createElement("div");
+  el.className = "toast " + cls;
+  el.innerHTML = `<div class="thead">${esc(head)}</div><div class="tbody">${esc(body)}</div>`;
+  el.onclick = () => { el.remove(); if (onclick) onclick(); };
+  $("#toasts").appendChild(el);
+  setTimeout(() => el.remove(), 12000);
+}
+
+function notifyNewEvents(list) {
+  for (const ev of list) {
+    if (!knownEventIds.has(ev.id)) {
+      knownEventIds.add(ev.id);
+      if (!eventsPrimed) continue;                    // don't announce the initial load
+      toast("⚠ NEW EVENT DETECTED", ev.title, "", () => openEvent(ev.id));
+      if ("Notification" in window && Notification.permission === "granted")
+        new Notification("SYNTHESIS — NEW EVENT DETECTED", { body: ev.title, icon: "/icons/icon-192.png" });
+    }
+  }
+  eventsPrimed = true;
+}
+
+$("#notifyBtn").addEventListener("click", async () => {
+  if (!("Notification" in window)) return toast("NOTIFICATIONS", "Not supported in this browser.", "info");
+  const p = await Notification.requestPermission();
+  toast("NOTIFICATIONS", p === "granted" ? "Enabled — you'll be alerted on NEW EVENT DETECTED." : "Permission not granted.", "info");
+});
+
 async function refreshEvents() {
   EVENTS = await api("/api/events");
+  notifyNewEvents(EVENTS);
+  renderEventList();
+}
+
+function renderEventList() {
   $("#eventList").innerHTML = EVENTS.map((ev) => `
     <div class="evrow" data-ev="${ev.id}">
       <span class="sev ${ev.severity}"></span>
@@ -119,6 +156,33 @@ async function refreshEvents() {
   if (!selectedEvent && EVENTS.length) loadEvent(EVENTS[0].id);
   drawMap();
 }
+
+/* ---------------- federation (SYNTHESIS Protocol v0) ---------------- */
+async function refreshFederation() {
+  try {
+    const f = await api("/api/federation/status");
+    const id = f.identity;
+    $("#fedStatus").innerHTML =
+      `<div class="fednode">this node: <b>${esc(id.name)}</b> · id ${esc(id.node_id)} · ${esc(id.protocol)}<br>pubkey ${esc(id.pubkey.slice(0, 24))}…</div>` +
+      (f.peers.length
+        ? f.peers.map((p) => `<div class="fedpeer ${p.reachable === false ? "down" : ""}">
+            <b>${esc(p.name || p.url)}</b> ${p.node_id ? `<span class="meta">id ${esc(p.node_id)}</span>` : ""}
+            <div class="meta">${p.reachable === false ? "unreachable" : "signature verified ✓"} · imported ${p.imported_new} · corroborated ${p.corroborated} · rejected ${p.rejected}${p.last_sync ? " · sync " + esc(p.last_sync) : ""}</div>
+            ${p.last_error ? `<div class="meta">${esc(p.last_error)}</div>` : ""}
+          </div>`).join("")
+        : '<div class="muted" style="font-size:12px">No peers yet. Run a second node and peer it — matching claims become corroboration, new claims enter the chain with federated provenance.</div>') +
+      `<div class="fedprinciple">${esc(f.principle)}</div>`;
+  } catch (e) {}
+}
+$("#btnAddPeer").addEventListener("click", async () => {
+  const url = $("#peerUrl").value.trim();
+  if (!url) return;
+  try {
+    await api("/api/federation/peers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+    toast("FEDERATION", "Peer registered — first sync attempted.", "info");
+    refreshFederation(); refreshEvents();
+  } catch (e) { toast("FEDERATION", "Could not register peer.", "info"); }
+});
 
 /* ---------------- world map ---------------- */
 async function loadGeo() { try { worldGeo = await api("/world.geo.json"); drawMap(); } catch (e) {} }
@@ -421,10 +485,12 @@ async function boot() {
   await refreshFeed();
   loadGeo();
   refreshIngest();
+  refreshFederation();
   connectWS();
   setInterval(refreshState, 5000);
   setInterval(refreshFeed, 5000);
   setInterval(refreshIngest, 20000);
+  setInterval(refreshFederation, 15000);
   setInterval(refreshEvents, 30000);   // pick up adapter-created events
   setInterval(() => { if ($("#tab-ledger").classList.contains("active")) refreshLedger(); }, 5000);
   setInterval(() => { if ($("#tab-contra").classList.contains("active")) refreshContradictions(); }, 8000);

@@ -1,0 +1,38 @@
+name: "🔀 Contradiction report"
+description: "Two parts of SYNTHESIS (or system vs. documentation) make conflicting claims. File both claims — like the Contradiction Engine would."
+title: "CONFLICT: <topic>"
+labels: ["contradiction", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        SYNTHESIS never silently chooses one side. Neither do we.
+        State both claims with their evidence; resolution will preserve the history.
+  - type: textarea
+    id: claim-a
+    attributes:
+      label: Claim A
+      description: What one part of the system does/says. Include file paths, endpoints, or exact output.
+      placeholder: "server/world.py:tick() resolves forecasts by string comparison of ISO timestamps…"
+    validations:
+      required: true
+  - type: textarea
+    id: claim-b
+    attributes:
+      label: Claim B
+      description: The conflicting behavior/statement, with its evidence.
+      placeholder: "README states forecasts resolve on wall-clock expiry via datetime comparison…"
+    validations:
+      required: true
+  - type: textarea
+    id: observation
+    attributes:
+      label: Independent observation (optional)
+      description: Reproduction steps, logs, screenshots — anything a third party could verify.
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Impact if unresolved
+      options: ["analytical integrity at risk", "incorrect UI/API output", "documentation drift", "cosmetic"]
+    validations:
+      required: true

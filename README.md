@@ -1,3 +1,15 @@
+<p align="center">
+  <img src="assets/banner.png" alt="SYNTHESIS — Evidence → Hypothesis → Falsification → Forecast → Outcome → Learning" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/authorsauravkushwaha/SYNTHESIS/actions"><img alt="CI" src="https://img.shields.io/badge/CI-chain%20verified%20cross--language-22d3a5?style=flat-square"></a>
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-39d0d8?style=flat-square">
+  <img alt="Cost" src="https://img.shields.io/badge/runs%20on-%240%20%2F%20%E2%82%B90-eab308?style=flat-square">
+  <img alt="Polyglot" src="https://img.shields.io/badge/languages-Python%20%C2%B7%20TS%20%C2%B7%20JS%20%C2%B7%20C%20%C2%B7%20SQL%20%C2%B7%20Bash-7dd3fc?style=flat-square">
+  <img alt="PWA" src="https://img.shields.io/badge/installs%20on-PC%20%C2%B7%20Android%20%C2%B7%20iOS-a78bfa?style=flat-square">
+</p>
+
 # SYNTHESIS
 
 **The Evidence-Carrying Causal World Model** — an open platform that turns fragmented
@@ -119,6 +131,33 @@ stream) every 3 s. The channel is **read-only by design** — it accepts no
 commands, so a compromised client cannot mutate world state through it (§19).
 The web UI uses it automatically and falls back to polling if it drops.
 
+## Federation — SYNTHESIS Protocol v0 (§43)
+
+Nodes keep local data and exchange **Ed25519-signed observation bundles**.
+Identity is *proven, never claimed* (`node_id = sha256(pubkey)[:12]`), and the
+receiver verifies the signature **before** reading any content. The unique
+part — *federation as epistemology, not sync*:
+
+- a peer's claim that **matches** local evidence becomes independent
+  **corroboration** (marked `corroborated_by:<node_id>`), never a duplicate;
+- a peer's **new** claim enters the local tamper-evident chain with
+  `federated:<node_id>` provenance and reliability discounted ×0.95
+  (transitive trust decays);
+- rejected bundles/items are counted and reported — failure is visible.
+
+Try it in two terminals:
+
+```bash
+uvicorn server.main:app --port 8000                                        # node A
+SYNTHESIS_NODE_NAME=node-b SYNTHESIS_NODE_SEED=demo-b \
+  uvicorn server.main:app --port 8001                                      # node B
+curl -X POST localhost:8000/api/federation/peers \
+  -H 'Content-Type: application/json' -d '{"url":"http://localhost:8001"}'
+```
+
+…or paste the peer URL into the **FEDERATION** panel in the UI. Full wire
+format: **[docs/PROTOCOL.md](docs/PROTOCOL.md)**.
+
 ## Free to run — everywhere
 
 No paid services anywhere in the stack: free public data feeds (USGS,
@@ -174,6 +213,7 @@ Each language does the job it is best at:
 | `web/index.html`, `web/style.css` | **HTML / CSS** | Installable PWA shell |
 | `web/sw.js`, `web/manifest.webmanifest` | **JavaScript / JSON** | Offline shell + install on PC/mobile |
 | `server/ingest.py` | **Python** | Zero-trust live data adapters (USGS, Open-Meteo) with controlled failure |
+| `server/federation.py` | **Python** | SYNTHESIS Protocol v0: Ed25519-signed federated observation exchange |
 | `sdk/python/` | **Python** | Dependency-free SDK incl. client-side chain verification |
 | `sdk/typescript/` | **TypeScript** | Typed SDK: realtime channel + WebCrypto chain verification |
 | `tests/` | **Python / pytest** | World-model invariants + hostile-input ingestion tests |
@@ -202,6 +242,11 @@ GET  /api/calibration                reliability buckets, sector Brier
 POST /api/counterfactual             branch the causal model
 GET  /api/agents                     least-privilege agent roster
 GET  /api/ingest/status              live data adapter health (LIVE vs SIMULATION)
+GET  /api/federation/identity        this node's provable identity
+GET  /api/federation/observations    Ed25519-signed observation bundle
+GET  /api/federation/status          peers: imported / corroborated / rejected
+POST /api/federation/peers           register a peer node (pull-only)
+POST /api/federation/sync            manual federation sync
 ```
 
 Interactive docs at `/docs` (OpenAPI).

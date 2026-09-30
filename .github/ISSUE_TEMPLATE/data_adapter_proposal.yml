@@ -1,0 +1,41 @@
+name: "🔌 Data adapter proposal"
+description: "Propose a new free public data source. Provenance and failure modes first, code second — adapters can only propose observations."
+title: "ADAPTER: <source name>"
+labels: ["adapter", "ingestion"]
+body:
+  - type: input
+    id: source
+    attributes:
+      label: Source name & URL
+      placeholder: "NOAA Tides & Currents — https://api.tidesandcurrents.noaa.gov"
+    validations:
+      required: true
+  - type: dropdown
+    id: cost
+    attributes:
+      label: Access model
+      description: SYNTHESIS depends only on free sources.
+      options: ["free, no key", "free with free-tier key", "other (explain below)"]
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Provenance & reliability
+      description: Who produces it, how, at what latency? What is its historical reliability and what are its known limitations (§15)?
+    validations:
+      required: true
+  - type: textarea
+    id: mapping
+    attributes:
+      label: Mapping to the world model
+      description: What becomes evidence? What (if anything) auto-creates events, and with what templated cone? Which domains?
+    validations:
+      required: true
+  - type: textarea
+    id: failure
+    attributes:
+      label: Failure modes
+      description: Rate limits, outages, schema drift, adversarial content — and how the adapter degrades (§51).
+    validations:
+      required: true

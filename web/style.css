@@ -189,5 +189,23 @@ main{flex:1;padding:16px 18px;max-width:1500px;width:100%;margin:0 auto}
 .evfield{margin:6px 0;font-size:12.5px}
 .evfield b{color:var(--mut);font-size:10px;letter-spacing:1px;text-transform:uppercase;display:block}
 
+/* federation */
+.fedadd{display:flex;gap:8px;margin-top:10px}
+.fedadd input{flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:7px;color:var(--txt);padding:7px 10px;font:12px var(--mono)}
+.fednode{font-family:var(--mono);font-size:11px;color:var(--cyan);margin-bottom:8px;word-break:break-all}
+.fedpeer{border-left:2px solid var(--teal);padding:5px 10px;margin:6px 0;font-size:12px}
+.fedpeer.down{border-left-color:var(--red)}
+.fedpeer .meta{color:var(--mut);font-family:var(--mono);font-size:10.5px}
+.fedprinciple{margin-top:8px;font-size:11px;color:var(--mut);font-style:italic}
+
+/* toasts */
+#toasts{position:fixed;top:16px;right:16px;z-index:80;display:flex;flex-direction:column;gap:10px;max-width:360px}
+.toast{background:linear-gradient(135deg,#1a0b0b,#160b1e);border:1px solid #7f1d1d;border-radius:10px;padding:12px 14px;box-shadow:0 8px 30px #000a;animation:slidein .3s;cursor:pointer}
+.toast .thead{font-size:10px;letter-spacing:3px;color:#fca5a5;margin-bottom:4px}
+.toast .tbody{font-size:12.5px}
+.toast.info{border-color:#115e59}
+.toast.info .thead{color:#6ee7b7}
+@keyframes slidein{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+
 footer{display:flex;justify-content:space-between;gap:10px;padding:12px 18px;border-top:1px solid var(--line);color:var(--mut);font-size:11px;flex-wrap:wrap}
 .credit b{color:var(--cyan)}

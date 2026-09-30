@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from .world import WORLD, MODEL_VERSION
 from .ingest import INGESTOR
+from .federation import NODE
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 
@@ -48,6 +49,46 @@ async def security_headers(request, call_next):
 async def start_live_ingest():
     import asyncio
     asyncio.create_task(INGESTOR.run())
+    asyncio.create_task(NODE.run())
+
+
+# ------------------------------------------------------ federation (§43) ----
+
+class PeerRequest(BaseModel):
+    url: str = Field(min_length=8, max_length=200)
+
+
+@app.get("/api/federation/identity")
+def federation_identity():
+    """This node's provable identity: node_id = sha256(pubkey)[:12]."""
+    return NODE.identity.to_dict()
+
+
+@app.get("/api/federation/observations")
+def federation_observations():
+    """Ed25519-signed observation bundle for peers (SYNTHESIS Protocol v0)."""
+    return NODE.outbound_bundle()
+
+
+@app.get("/api/federation/status")
+def federation_status():
+    return NODE.status()
+
+
+@app.post("/api/federation/peers")
+def federation_add_peer(req: PeerRequest):
+    try:
+        peer = NODE.add_peer(req.url)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    NODE.sync_peer(peer)
+    return vars(peer)
+
+
+@app.post("/api/federation/sync")
+def federation_sync():
+    NODE.sync_all()
+    return NODE.status()
 
 
 # ---------------------------------------------------------------- API ----
