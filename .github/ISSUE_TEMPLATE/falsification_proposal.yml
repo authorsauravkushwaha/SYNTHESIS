@@ -1,0 +1,34 @@
+name: "✕ Falsification proposal"
+description: "You believe a design assumption or hypothesis in SYNTHESIS is wrong — propose the test that would prove it, like the Falsification Engine would."
+title: "FALSIFY: <assumption>"
+labels: ["falsification", "design"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A claim you cannot test is a claim we should not rely on.
+        The strongest contribution here is a *runnable* falsifier.
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: The assumption/hypothesis under attack
+      placeholder: "The counterfactual impact scaling (1 - exp(-h/96)) meaningfully approximates buffer exhaustion…"
+    validations:
+      required: true
+  - type: textarea
+    id: falsifier
+    attributes:
+      label: Falsification condition
+      description: What observation, test, or benchmark would prove it wrong?
+      placeholder: "If historical port-closure datasets show recovery is bimodal rather than exponential, the model is mis-specified. Test against …"
+    validations:
+      required: true
+  - type: textarea
+    id: watchpoints
+    attributes:
+      label: Watchpoints
+      description: What should we monitor/measure while evaluating this?
+  - type: textarea
+    id: alternative
+    attributes:
+      label: Competing explanation / proposed replacement (optional)

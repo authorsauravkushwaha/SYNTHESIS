@@ -1,0 +1,15 @@
+{
+  "name": "SYNTHESIS — Causal World Model",
+  "short_name": "SYNTHESIS",
+  "description": "Evidence-carrying temporal causal world model: hypotheses, falsification, forecasts, outcomes, calibration.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070b16",
+  "theme_color": "#070b16",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SYNTHESIS — Evidence-Carrying Causal World Model</title>
+<meta name="description" content="Temporal causal world model: evidence, competing hypotheses, falsification, forecasts, outcomes, calibration.">
+<meta name="theme-color" content="#070b16">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="brand">
+    <img src="/icons/icon-192.png" alt="" width="34" height="34">
+    <div>
+      <h1>SYNTHESIS</h1>
+      <span class="tagline">The Evidence-Carrying Causal World Model</span>
+    </div>
+  </div>
+  <div class="topstats" id="topstats"></div>
+  <div class="topactions">
+    <span class="chainpill" id="chainpill" title="Tamper-evident evidence chain head (sha256)">chain —</span>
+    <button id="notifyBtn" class="btn ghost" title="Browser notifications for NEW EVENT DETECTED">🔔</button>
+    <button id="installBtn" class="btn ghost hidden">⬇ Install app</button>
+  </div>
+</header>
+
+<nav id="tabs">
+  <button data-tab="global" class="active">GLOBAL STATE</button>
+  <button data-tab="event">EVENT ANALYSIS</button>
+  <button data-tab="contra">CONTRADICTIONS</button>
+  <button data-tab="ledger">OUTCOME LEDGER</button>
+  <button data-tab="agents">AGENTS</button>
+</nav>
+
+<main>
+  <!-- ============ GLOBAL STATE ============ -->
+  <section id="tab-global" class="tab active">
+    <div class="grid-global">
+      <div class="panel" id="stateTiles"></div>
+      <div class="panel mappanel">
+        <div class="panel-title">GLOBAL EVENT MAP <span class="sub">click an event dot to analyze</span></div>
+        <canvas id="worldmap" width="1100" height="520"></canvas>
+        <div id="maplegend"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">LIVE EVIDENCE STREAM <span class="live-dot"></span></div>
+        <div id="feed" class="feed"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">ACTIVE CROSS-DOMAIN EVENTS</div>
+        <div id="eventList"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">DATA ADAPTERS <span class="sub">zero-trust ingestion — external content is data, never instructions</span></div>
+        <div id="ingestStatus" class="muted">checking…</div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">FEDERATION <span class="sub">SYNTHESIS Protocol v0 — Ed25519-signed observation exchange (§43)</span></div>
+        <div id="fedStatus" class="muted">loading…</div>
+        <div class="fedadd">
+          <input id="peerUrl" type="text" placeholder="peer node url, e.g. http://localhost:8001">
+          <button class="btn" id="btnAddPeer">⇄ Peer</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EVENT ANALYSIS ============ -->
+  <section id="tab-event" class="tab">
+    <div class="event-head">
+      <select id="eventSelect"></select>
+      <div class="event-actions">
+        <button class="btn primary" id="btnAnalyze">Analyze impact</button>
+        <button class="btn" id="btnChallenge">⚔ Challenge this</button>
+        <button class="btn" id="btnFalsify">✕ What would prove this wrong?</button>
+      </div>
+    </div>
+    <div class="panel" id="eventSummary"></div>
+
+    <div class="grid-event">
+      <div class="panel conepanel">
+        <div class="panel-title">IMPACT CONE <span class="sub" id="coneMode">baseline causal model</span></div>
+        <div id="coneWrap"><svg id="coneSvg"></svg></div>
+        <div id="coneLegend"></div>
+        <div class="cf-bar">
+          <span class="cf-label">COUNTERFACTUAL:</span>
+          <label>disruption lasts <input type="range" id="cfDuration" min="6" max="336" step="6" value="168">
+          <b id="cfDurationLabel">168 h (7 d)</b></label>
+          <label>recovery
+            <select id="cfRecovery">
+              <option value="immediate">immediate</option>
+              <option value="normal" selected>normal</option>
+              <option value="slow">slow</option>
+            </select>
+          </label>
+          <button class="btn" id="btnBranch">⑂ Branch scenario</button>
+          <button class="btn ghost" id="btnBaseline">reset</button>
+        </div>
+        <div id="cfNarrative"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">COMPETING HYPOTHESES <span class="sub">click one to inspect evidence</span></div>
+        <div id="hypList"></div>
+      </div>
+    </div>
+
+    <div class="grid-event2">
+      <div class="panel"><div class="panel-title" id="detailTitle">HYPOTHESIS DETAIL</div><div id="hypDetail" class="muted">Select a hypothesis above, then use “Why?”, “Challenge this”, or the Falsification Engine.</div></div>
+      <div class="panel"><div class="panel-title">ADVERSARIAL AGENT</div><div id="advOut" class="muted">Press “⚔ Challenge this” to attack the selected hypothesis.</div></div>
+    </div>
+  </section>
+
+  <!-- ============ CONTRADICTIONS ============ -->
+  <section id="tab-contra" class="tab">
+    <div class="panel">
+      <div class="panel-title">CONTRADICTION ENGINE <span class="sub">conflicting sources become first-class objects — never silently resolved</span></div>
+      <div id="contraList"></div>
+    </div>
+  </section>
+
+  <!-- ============ OUTCOME LEDGER ============ -->
+  <section id="tab-ledger" class="tab">
+    <div class="grid-ledger">
+      <div class="panel">
+        <div class="panel-title">FORECASTS UNDER OBSERVATION</div>
+        <div id="openForecasts"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">RESOLVED OUTCOMES</div>
+        <div id="resolvedForecasts" class="muted">No forecast has resolved yet in this session — forecast_8842 resolves live in a few minutes. Keep watching.</div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">MODEL CALIBRATION <span class="sub" id="calSummary"></span></div>
+        <canvas id="calChart" width="520" height="220"></canvas>
+        <div id="sectorStats"></div>
+        <div class="chainbox">
+          <b>Tamper-evident evidence chain</b>
+          <p>Every evidence record is chained with sha256(prev ∥ payload). Export and verify independently:</p>
+          <code>curl -s &lt;host&gt;/api/ledger/export | ./tools/ledgercheck/ledgercheck</code>
+          <a class="btn ghost" href="/api/ledger/export" target="_blank">Export chain (TSV)</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ AGENTS ============ -->
+  <section id="tab-agents" class="tab">
+    <div class="panel">
+      <div class="panel-title">MULTI-AGENT ROSTER <span class="sub">least-privilege, sandboxed, proposals-only — no agent rewrites authoritative state</span></div>
+      <div id="agentList" class="agentgrid"></div>
+    </div>
+    <div class="grid-event2">
+      <div class="panel">
+        <div class="panel-title">SECURITY POSTURE <span class="sub">§24 — honestly reported, never silently insecure</span></div>
+        <div id="secStatus" class="muted">loading…</div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">AUDIT TRAIL <span class="sub">hash-chained — verify with the same C tool as evidence</span></div>
+        <div id="auditList" class="feed" style="max-height:280px"></div>
+        <a class="btn ghost" href="/api/audit/export" target="_blank" style="margin-top:8px;display:inline-block">Export audit chain (TSV)</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span>SYNTHESIS MVP · decision support, never autonomous authority · every conclusion traceable to evidence</span>
+  <span class="credit">Made by <b>Saurav Kushwaha</b></span>
+</footer>
+
+<div id="modal" class="hidden"><div id="modalCard"><button id="modalClose">✕</button><div id="modalBody"></div></div></div>
+<div id="toasts"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

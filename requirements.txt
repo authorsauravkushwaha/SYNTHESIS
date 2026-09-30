@@ -1,0 +1,5 @@
+# pinned per supply-chain policy (section 22)
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
+pydantic==2.13.5
+cryptography==50.0.2
