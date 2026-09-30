@@ -4,3 +4,4 @@ __pycache__/
 .env
 tools/ledgercheck/ledgercheck
 *.log
+dist/

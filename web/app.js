@@ -2,7 +2,67 @@
 "use strict";
 
 const $ = (s) => document.querySelector(s);
-const api = (p, opt) => fetch(p, opt).then((r) => { if (!r.ok) throw new Error(p); return r.json(); });
+
+/* ---- transport: live API with automatic static-snapshot fallback ----------
+   Served by a live node → every call hits /api/* as usual.
+   Served without a backend (GitHub Pages, file hosting) → GETs fall back to
+   the frozen JSON snapshot under ./data/ and the console enters read-only
+   STATIC mode. Counterfactual branching still runs — ported client-side. */
+let STATIC_MODE = false;
+const fetchJSON = (p, opt) => fetch(p, opt).then((r) => { if (!r.ok) throw new Error(p); return r.json(); });
+const staticPath = (p) => "data/" + p.replace(/^\/api\//, "").split("?")[0].replace(/\//g, "__") + ".json";
+async function api(p, opt) {
+  const isApi = p.startsWith("/api/");
+  const isPost = !!(opt && opt.method === "POST");
+  if (STATIC_MODE && isApi) {
+    if (p === "/api/counterfactual" && isPost) return localCounterfactual(JSON.parse(opt.body));
+    if (isPost) throw new Error("STATIC_READONLY");
+    return fetchJSON(staticPath(p));
+  }
+  try { return await fetchJSON(p, opt); }
+  catch (e) {
+    if (isApi && !isPost) {
+      const d = await fetchJSON(staticPath(p));   // rethrows if snapshot missing too
+      enterStaticMode();
+      return d;
+    }
+    throw e;
+  }
+}
+function enterStaticMode() {
+  if (STATIC_MODE) return;
+  STATIC_MODE = true;
+  fetchJSON("data/meta.json").then((m) => {
+    document.body.insertAdjacentHTML("afterbegin",
+      `<div class="static-banner">📡 STATIC SNAPSHOT — GitHub Pages build, world state frozen at ${esc(m.built_at)}. ` +
+      `Streams, federation actions and adversarial challenges need a live node — see the README quick start. Everything you see was produced by the real engine.</div>`);
+  }).catch(() => {});
+}
+/* client-side port of World.counterfactual() — same math, same narrative */
+async function localCounterfactual({ event_id, duration_hours: d, recovery }) {
+  const [cone, ev] = await Promise.all([api(`/api/events/${event_id}/cone`), api("/api/events/" + event_id)]);
+  const scale = (1 - Math.exp(-d / 96)) * ({ immediate: 0.35, normal: 1.0, slow: 1.35 }[recovery]);
+  const sev = (c) => { const s = c * (0.4 + scale); return s > 0.75 ? "severe" : s > 0.5 ? "high" : s > 0.3 ? "moderate" : s > 0.15 ? "low" : "minimal"; };
+  const nodes = cone.nodes.map((n) => {
+    const inb = cone.edges.filter((e) => e.target === n.id).map((e) => e.confidence);
+    const conf = inb.length ? Math.max(...inb) : 1.0;
+    return { id: n.id, label: n.label, layer: n.layer, domain: n.domain,
+             projected_impact: n.layer > 0 ? sev(conf) : "source",
+             impact_score: n.layer > 0 ? Math.round(Math.min(0.99, conf * (0.4 + scale)) * 100) / 100 : 1.0 };
+  });
+  const narrative = [];
+  narrative.push(d <= 24
+    ? "Short disruption: buffers at ports and SEZ backup power largely absorb the shock; economic exposure stays minimal."
+    : d <= 96
+    ? "Multi-day disruption: logistics and production effects become material; supply-chain propagation begins but remains regional."
+    : "Extended disruption: buffer stocks exhausted; supply-chain and economic layers activate. Cross-regional substitution expected.");
+  if (recovery === "immediate") narrative.push("Immediate-recovery assumption suppresses downstream layers by ~65%.");
+  if (recovery === "slow") narrative.push("Slow-recovery assumption amplifies tail risk; watch grid restoration rate first.");
+  return { event_id, scenario: { duration_hours: d, recovery }, generated_at: new Date().toISOString(),
+           model_version: cone.model_version || "static-snapshot",
+           caveat: "Counterfactual branches are scenario analysis under stated assumptions — not promises of future certainty.",
+           nodes, edges: cone.edges, narrative, event_title: ev.title };
+}
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 const DOMCOLORS = { weather:"#7dd3fc", maritime:"#39d0d8", energy:"#eab308", infrastructure:"#f97316", trade:"#a78bfa", economy:"#f472b6" };
@@ -77,6 +137,7 @@ async function refreshFeed() {
 /* ---------------- realtime channel (WebSocket, read-only; falls back to polling) */
 let wsFresh = 0;
 function connectWS() {
+  if (STATIC_MODE) return;                    // no realtime channel on a frozen snapshot
   let ws;
   try { ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"); }
   catch (e) { return setTimeout(connectWS, 10000); }
@@ -182,6 +243,7 @@ async function refreshFederation() {
 $("#btnAddPeer").addEventListener("click", async () => {
   const url = $("#peerUrl").value.trim();
   if (!url) return;
+  if (STATIC_MODE) return toast("FEDERATION", "Static snapshot — peering needs a live node.", "info");
   const attempt = async () => fetch("/api/federation/peers", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Api-Key": localStorage.getItem("synthesis_api_key") || "" },
@@ -202,7 +264,7 @@ $("#btnAddPeer").addEventListener("click", async () => {
 });
 
 /* ---------------- world map ---------------- */
-async function loadGeo() { try { worldGeo = await api("/world.geo.json"); drawMap(); } catch (e) {} }
+async function loadGeo() { try { worldGeo = await fetchJSON("./world.geo.json"); drawMap(); } catch (e) {} }
 function proj(lon, lat, w, h) { return [(lon + 180) / 360 * w, (90 - lat) / 180 * h * (180 / 150)]; } // crop poles slightly
 function drawMap() {
   const cv = $("#worldmap"); if (!cv) return;
@@ -377,6 +439,10 @@ function bindEvidenceChips(root) {
 $("#btnAnalyze").addEventListener("click", () => { if (selectedEvent) { coneCache = null; renderCone(selectedEvent); } });
 $("#btnChallenge").addEventListener("click", async () => {
   if (!selectedHyp) return;
+  if (STATIC_MODE) {
+    $("#advOut").innerHTML = `<div class="finding medium"><span class="ftype">STATIC SNAPSHOT</span><div>The Adversarial Agent runs on a live node — this is a frozen GitHub Pages build. Clone the repo and run <b>uvicorn server.main:app</b> to attack hypotheses in real time.</div></div>`;
+    return;
+  }
   $("#advOut").innerHTML = `<span class="muted">Adversarial Agent attacking hypothesis…</span>`;
   const r = await api(`/api/hypotheses/${selectedHyp}/challenge`, { method: "POST" });
   $("#advOut").innerHTML =
@@ -509,7 +575,7 @@ $("#modal").addEventListener("click", (e) => { if (e.target.id === "modal") $("#
 let deferredPrompt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredPrompt = e; $("#installBtn").classList.remove("hidden"); });
 $("#installBtn").addEventListener("click", async () => { if (deferredPrompt) { deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; $("#installBtn").classList.add("hidden"); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
 
 /* ---------------- boot ---------------- */
 async function boot() {

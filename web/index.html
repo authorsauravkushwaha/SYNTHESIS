@@ -6,15 +6,15 @@
 <title>SYNTHESIS — Evidence-Carrying Causal World Model</title>
 <meta name="description" content="Temporal causal world model: evidence, competing hypotheses, falsification, forecasts, outcomes, calibration.">
 <meta name="theme-color" content="#070b16">
-<link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" href="/icons/icon-192.png">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
-<link rel="stylesheet" href="/style.css">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <header id="topbar">
   <div class="brand">
-    <img src="/icons/icon-192.png" alt="" width="34" height="34">
+    <img src="./icons/icon-192.png" alt="" width="34" height="34">
     <div>
       <h1>SYNTHESIS</h1>
       <span class="tagline">The Evidence-Carrying Causal World Model</span>
@@ -141,7 +141,7 @@
           <b>Tamper-evident evidence chain</b>
           <p>Every evidence record is chained with sha256(prev ∥ payload). Export and verify independently:</p>
           <code>curl -s &lt;host&gt;/api/ledger/export | ./tools/ledgercheck/ledgercheck</code>
-          <a class="btn ghost" href="/api/ledger/export" target="_blank">Export chain (TSV)</a>
+          <a class="btn ghost" href="api/ledger/export" target="_blank">Export chain (TSV)</a>
         </div>
       </div>
     </div>
@@ -161,7 +161,7 @@
       <div class="panel">
         <div class="panel-title">AUDIT TRAIL <span class="sub">hash-chained — verify with the same C tool as evidence</span></div>
         <div id="auditList" class="feed" style="max-height:280px"></div>
-        <a class="btn ghost" href="/api/audit/export" target="_blank" style="margin-top:8px;display:inline-block">Export audit chain (TSV)</a>
+        <a class="btn ghost" href="api/audit/export" target="_blank" style="margin-top:8px;display:inline-block">Export audit chain (TSV)</a>
       </div>
     </div>
   </section>
@@ -175,6 +175,6 @@
 <div id="modal" class="hidden"><div id="modalCard"><button id="modalClose">✕</button><div id="modalBody"></div></div></div>
 <div id="toasts"></div>
 
-<script src="/app.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>

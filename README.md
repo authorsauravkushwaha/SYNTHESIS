@@ -31,6 +31,23 @@ installable web app that runs on PC and mobile.
 
 ---
 
+## 🌐 Website — use it straight from GitHub
+
+**https://authorsauravkushwaha.github.io/SYNTHESIS/** — no install, no server, $0.
+
+Every push to `main` runs [`pages.yml`](.github/workflows/pages.yml): it boots
+**two real peered SYNTHESIS nodes**, lets the world evolve for 150 s (watchpoints
+fire, contradictions resolve, cross-node reviews complete), freezes the state
+into JSON and deploys the console to GitHub Pages. The web client detects the
+missing API and switches to STATIC SNAPSHOT mode automatically — same UI, real
+engine-produced data, counterfactual branching runs client-side, the evidence
+chain export still verifies with the C tool, and the PWA still installs on PC
+and mobile. Actions that need a live node (adversarial challenge, peering,
+live streams) say so honestly instead of pretending.
+
+> First deployment: the workflow auto-enables Pages. If your org blocks that,
+> enable it once under *Settings → Pages → Source: GitHub Actions*.
+
 ## Quick start
 
 ```bash

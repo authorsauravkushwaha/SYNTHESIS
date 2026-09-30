@@ -1,3 +1,5 @@
+.static-banner{background:linear-gradient(90deg,#1a2340,#12305a);border-bottom:1px solid #2b4a7a;color:#9fc3ef;font:12px/1.5 var(--mono);padding:7px 16px;text-align:center;letter-spacing:.02em}
+.static-banner b{color:#d7e8ff}
 :root{
   --bg:#070b16; --bg2:#0b1222; --panel:#0d1526; --panel2:#111c33;
   --line:#1c2a47; --txt:#d7e2f4; --mut:#7d8db0; --cyan:#39d0d8; --teal:#22d3a5;
