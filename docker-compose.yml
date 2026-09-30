@@ -1,0 +1,25 @@
+# Local stack. The MVP app is self-contained; postgres/redis are the
+# production-target stores the reference schema (db/schema.sql) maps onto.
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: synthesis
+      POSTGRES_USER: synthesis
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env, never in code}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+
+volumes:
+  pgdata:
