@@ -21,6 +21,11 @@ jobs:
         run: python -m compileall server && python -c "from server.world import WORLD; s=WORLD.global_state(); assert s['chain_length']>10"
       - name: World-model invariants & zero-trust ingestion tests
         run: python -m pytest tests/ -q
+      - name: Type-check TypeScript SDK
+        working-directory: sdk/typescript
+        run: |
+          npm install --no-save typescript@5.6.3
+          ./node_modules/.bin/tsc -p tsconfig.json
       - name: Build C ledger verifier
         run: gcc -O2 -Wall -Werror -o tools/ledgercheck/ledgercheck tools/ledgercheck/ledgercheck.c
       - name: Verify tamper-evident chain (C tool vs Python chain)

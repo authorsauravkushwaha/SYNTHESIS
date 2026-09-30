@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -205,6 +205,27 @@ def agents():
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "model_version": MODEL_VERSION}
+
+
+@app.websocket("/ws")
+async def live_push(ws: WebSocket):
+    """Real-time push of global state + evidence stream (no polling needed).
+    Read-only: the socket carries world state outward; it accepts no commands —
+    clients cannot mutate anything through this channel (least privilege, §19)."""
+    import asyncio
+    await ws.accept()
+    try:
+        while True:
+            WORLD.tick()
+            await ws.send_json({
+                "type": "world_update",
+                "state": WORLD.global_state(),
+                "feed": WORLD.feed(14),
+                "ingest_mode": INGESTOR.status()["mode"],
+            })
+            await asyncio.sleep(3)
+    except (WebSocketDisconnect, RuntimeError):
+        pass
 
 
 # ------------------------------------------------------------- static ----

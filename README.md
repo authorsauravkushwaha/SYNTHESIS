@@ -104,6 +104,28 @@ ok, n, head = c.verify_chain()                     # client-side, independent
 
 Run the whole intelligence loop from code: `PYTHONPATH=sdk/python python3 sdk/python/example.py`
 
+## TypeScript SDK (§44)
+
+`sdk/typescript/synthesis-sdk.ts` — zero-dependency, fully typed, works in
+Node 18+, browsers and Deno. Includes `live()` for the realtime WebSocket
+channel and `verifyChain()` — independent client-side chain verification via
+WebCrypto. The chain now has verifiers in **three languages** (C, Python,
+TypeScript): you never have to trust the platform's own arithmetic.
+
+## Realtime channel
+
+`ws(s)://<host>/ws` pushes `world_update` messages (global state + evidence
+stream) every 3 s. The channel is **read-only by design** — it accepts no
+commands, so a compromised client cannot mutate world state through it (§19).
+The web UI uses it automatically and falls back to polling if it drops.
+
+## Free to run — everywhere
+
+No paid services anywhere in the stack: free public data feeds (USGS,
+Open-Meteo), free CI, free hosting options from your own PC to Hugging Face
+Spaces to a phone running Termux. See **[docs/DEPLOY_FREE.md](docs/DEPLOY_FREE.md)**
+for seven zero-cost deployment paths and the free-tier scaling table.
+
 ## Tests
 
 ```bash
@@ -153,6 +175,7 @@ Each language does the job it is best at:
 | `web/sw.js`, `web/manifest.webmanifest` | **JavaScript / JSON** | Offline shell + install on PC/mobile |
 | `server/ingest.py` | **Python** | Zero-trust live data adapters (USGS, Open-Meteo) with controlled failure |
 | `sdk/python/` | **Python** | Dependency-free SDK incl. client-side chain verification |
+| `sdk/typescript/` | **TypeScript** | Typed SDK: realtime channel + WebCrypto chain verification |
 | `tests/` | **Python / pytest** | World-model invariants + hostile-input ingestion tests |
 | `docs/VISION.md` | **Markdown** | The full 55-section vision document |
 | `db/schema.sql` | **SQL (PostgreSQL + PostGIS)** | Production-target schema for the full data model (§29–31) |

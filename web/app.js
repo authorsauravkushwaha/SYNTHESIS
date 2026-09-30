@@ -29,9 +29,7 @@ function showTab(name) {
 }
 
 /* ---------------- global state ---------------- */
-async function refreshState() {
-  try {
-    const s = await api("/api/state");
+function renderState(s) {
     $("#topstats").innerHTML = [
       ["active observations", s.active_observations.toLocaleString()],
       ["cross-domain events", s.cross_domain_events],
@@ -52,12 +50,14 @@ async function refreshState() {
         ["Model calibration", s.model_calibration_pct + "%", 1],
         ["Mean Brier score", s.mean_brier, 0],
       ].map(([k, v, a]) => `<div class="tile${a ? " accent" : ""}"><b>${v}</b><span>${k}</span></div>`).join("");
-  } catch (e) { /* server restarting */ }
 }
 
-async function refreshFeed() {
-  try {
-    const feed = await api("/api/feed?limit=14");
+async function refreshState() {
+  if (Date.now() - wsFresh < 8000) return;          // realtime channel is live
+  try { renderState(await api("/api/state")); } catch (e) { /* server restarting */ }
+}
+
+function renderFeed(feed) {
     $("#feed").innerHTML = feed.map((r) => {
       const fresh = !feedSeen.has(r.id);
       feedSeen.add(r.id);
@@ -67,7 +67,27 @@ async function refreshFeed() {
         <span class="meta">${r.id} · ${esc(r.classification)} · hash ${r.content_hash.slice(0, 10)}…</span>
       </div>`;
     }).join("");
-  } catch (e) {}
+}
+
+async function refreshFeed() {
+  if (Date.now() - wsFresh < 8000) return;          // realtime channel is live
+  try { renderFeed(await api("/api/feed?limit=14")); } catch (e) {}
+}
+
+/* ---------------- realtime channel (WebSocket, read-only; falls back to polling) */
+let wsFresh = 0;
+function connectWS() {
+  let ws;
+  try { ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"); }
+  catch (e) { return setTimeout(connectWS, 10000); }
+  ws.onmessage = (m) => {
+    try {
+      const d = JSON.parse(m.data);
+      if (d.type === "world_update") { wsFresh = Date.now(); renderState(d.state); renderFeed(d.feed); }
+    } catch (e) {}
+  };
+  ws.onclose = () => { wsFresh = 0; setTimeout(connectWS, 5000); };
+  ws.onerror = () => ws.close();
 }
 
 async function refreshIngest() {
@@ -401,6 +421,7 @@ async function boot() {
   await refreshFeed();
   loadGeo();
   refreshIngest();
+  connectWS();
   setInterval(refreshState, 5000);
   setInterval(refreshFeed, 5000);
   setInterval(refreshIngest, 20000);
