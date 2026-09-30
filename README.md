@@ -176,6 +176,22 @@ scripts/synthesisctl verify              # re-verify the evidence chain locally
 SYNTHESIS_URL=https://your-node synthesisctl ledger
 ```
 
+## API security (§24) — implemented, not just documented
+
+- **Rate limiting**: token buckets per client (240 GET/min, 40 POST/min) → 429
+- **Authentication**: set `SYNTHESIS_ADMIN_KEY` and privileged routes
+  (federation peer management) require `X-Api-Key` (constant-time compare).
+  Unset = demo-open mode — **honestly reported** at `/api/security/status`,
+  never silently insecure. Secrets come from the environment, never code.
+- **Tamper-evident audit trail**: every privileged call, auth denial and
+  rate-limit hit is appended to a hash chain — the *same construction* as the
+  evidence chain, verifiable with the *same C tool*:
+  `curl -s <host>/api/audit/export | ./tools/ledgercheck/ledgercheck`
+- Federation **v0.3**: forecast outcomes reprice peer trust — evidence from a
+  peer that keeps backing falsified forecasts mechanically loses weight
+  (outcomes count double in the Beta posterior; reality is the strongest
+  reviewer).
+
 ## Signed releases (§21–22)
 
 Tagging `v*` triggers `.github/workflows/release.yml`: the invariant suite

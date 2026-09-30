@@ -81,6 +81,7 @@ class World:
         self.script_cursor = 0
         self.obs_counter = 18492          # baseline "active observations"
         self.challenges: dict[str, list] = {}
+        self.outcome_listeners: list = []   # called on forecast resolution (fed v0.3)
         self._build_world()
         self._build_history()
 
@@ -771,6 +772,14 @@ class World:
             "brier": round((f["probability"] - (1.0 if f["status"] == "correct" else 0.0)) ** 2, 4),
             "resolved_at": iso(now()),
         })
+        # notify listeners (e.g. federation v0.3: outcomes reprice peer trust)
+        h = self.hypotheses.get(f["hypothesis_id"])
+        if h:
+            for listener in self.outcome_listeners:
+                try:
+                    listener(list(h["evidence_ids"]), f["status"] == "correct")
+                except Exception:
+                    pass                      # a listener must never break resolution
 
     # ------------------------------------------------------------------------------
     # Queries

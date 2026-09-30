@@ -12,13 +12,14 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .world import WORLD, MODEL_VERSION
 from .ingest import INGESTOR
 from .federation import NODE
+from . import security
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 
@@ -38,6 +39,23 @@ app.add_middleware(
 
 @app.middleware("http")
 async def security_headers(request, call_next):
+    path = request.url.path
+    if path.startswith("/api/"):
+        client = request.client.host if request.client else "unknown"
+        # 1. rate limiting (§24)
+        ok, _remaining = security.LIMITER.allow(client, request.method)
+        if not ok:
+            security.AUDIT.record(client, "rate_limited", path)
+            return JSONResponse({"detail": "rate limit exceeded"}, status_code=429)
+        # 2. authentication for privileged routes (§24) — enforced only when
+        #    SYNTHESIS_ADMIN_KEY is set; mode is always reported honestly
+        if request.method == "POST" and path.startswith(security.PRIVILEGED_PREFIXES):
+            if not security.check_key(request.headers.get("x-api-key", "")):
+                security.AUDIT.record(client, "auth_denied", path)
+                return JSONResponse({"detail": "invalid or missing X-Api-Key"}, status_code=401)
+            security.AUDIT.record(client, "privileged_call", path)
+        elif request.method == "POST":
+            security.AUDIT.record(client, "analysis_call", path)
     resp = await call_next(request)
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Referrer-Policy"] = "no-referrer"
@@ -246,6 +264,28 @@ def agents():
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "model_version": MODEL_VERSION}
+
+
+# ------------------------------------------------------- security (§24) ----
+
+@app.get("/api/security/status")
+def security_status():
+    return security.status()
+
+
+@app.get("/api/audit")
+def audit_tail(limit: int = 50):
+    """Tamper-evident audit trail — privileged actions and denials."""
+    return {"entries": security.AUDIT.tail(min(max(limit, 1), 200)),
+            "chain_head": security.AUDIT.chain.head,
+            "chain_length": len(security.AUDIT.chain.records)}
+
+
+@app.get("/api/audit/export", response_class=PlainTextResponse)
+def audit_export():
+    """Audit hash chain (TSV) — verifiable with the same C tool as evidence:
+    curl -s <host>/api/audit/export | ./tools/ledgercheck/ledgercheck"""
+    return security.AUDIT.chain.export_tsv()
 
 
 @app.websocket("/ws")

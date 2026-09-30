@@ -29,7 +29,10 @@ Especially interesting classes of report:
 
 ## Scope notes
 
-This is an MVP: authentication, rate limiting and secret management are
-documented targets (vision §18, §24) and not yet fully implemented — reports
-that turn those sections into working code are as valuable as vulnerability
-reports.
+Implemented and in scope for reports: rate limiting (token buckets → 429),
+API-key auth on privileged routes (`SYNTHESIS_ADMIN_KEY`, constant-time
+compare, honest mode reporting), and the hash-chained audit trail
+(`/api/audit/export`, verifiable with `tools/ledgercheck`). Still documented
+targets: full RBAC, per-user identities, secret rotation (vision §18–§20) —
+PRs that turn those sections into working code are as valuable as
+vulnerability reports.

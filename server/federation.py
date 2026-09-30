@@ -106,15 +106,20 @@ class PeerState:
     imported_new: int = 0
     corroborated: int = 0
     rejected: int = 0
+    outcome_hits: int = 0       # v0.3: peer evidence backed a CORRECT forecast
+    outcome_misses: int = 0     # v0.3: peer evidence backed a FAILED forecast
     trust: float = 0.5          # learned — Beta-posterior mean, never asserted
     last_error: str | None = None
 
     def learn_trust(self) -> None:
-        """Trust is earned from behavior, not claimed (protocol v0.2 preview):
-        Laplace-smoothed Beta posterior — corroborations are successes,
-        rejections are failures, novel imports are neutral until the outcome
-        ledger can score them (v0.3)."""
-        self.trust = round((1 + self.corroborated) / (2 + self.corroborated + self.rejected), 3)
+        """Trust is earned from behavior, not claimed. Beta posterior with
+        Laplace smoothing (protocol v0.3): corroborations are successes,
+        rejections are failures — and outcomes weigh DOUBLE, because reality
+        is the strongest reviewer: a peer whose observations keep backing
+        falsified forecasts loses weight mechanically."""
+        succ = self.corroborated + 2 * self.outcome_hits
+        fail = self.rejected + 2 * self.outcome_misses
+        self.trust = round((1 + succ) / (2 + succ + fail), 3)
 
     def import_discount(self) -> float:
         """Reliability multiplier for evidence imported from this peer.
@@ -130,6 +135,26 @@ class FederationNode:
         self._imported: set[str] = set()          # (peer_id, statement) keys
         self._fed_seq = 0
         self._seed_local_observations()
+        WORLD.outcome_listeners.append(self._on_outcome)   # protocol v0.3
+
+    def _on_outcome(self, evidence_ids: list[str], correct: bool) -> None:
+        """Outcome ledger → peer trust (v0.3): when a forecast resolves, every
+        piece of federated evidence its hypothesis cited is repriced."""
+        for eid in evidence_ids:
+            ev = WORLD.evidence.get(eid)
+            if not ev:
+                continue
+            indep = ev.get("independence", "")
+            if not indep.startswith(("federated:", "corroborated_by:")):
+                continue
+            node_id = indep.split(":", 1)[1]
+            for peer in self.peers.values():
+                if peer.node_id == node_id:
+                    if correct:
+                        peer.outcome_hits += 1
+                    else:
+                        peer.outcome_misses += 1
+                    peer.learn_trust()
 
     # -- unique local signal (so cross-node exchange is visible in demos) ----
     def _seed_local_observations(self) -> None:

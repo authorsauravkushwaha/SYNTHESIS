@@ -167,7 +167,7 @@ async function refreshFederation() {
       (f.peers.length
         ? f.peers.map((p) => `<div class="fedpeer ${p.reachable === false ? "down" : ""}">
             <b>${esc(p.name || p.url)}</b> ${p.node_id ? `<span class="meta">id ${esc(p.node_id)}</span>` : ""}
-            <div class="meta">${p.reachable === false ? "unreachable" : "signature verified ✓"} · trust ${p.trust} (learned) · imported ${p.imported_new} · corroborated ${p.corroborated} · rejected ${p.rejected}${p.last_sync ? " · sync " + esc(p.last_sync) : ""}</div>
+            <div class="meta">${p.reachable === false ? "unreachable" : "signature verified ✓"} · trust ${p.trust} (learned) · imported ${p.imported_new} · corroborated ${p.corroborated} · rejected ${p.rejected} · outcomes ${p.outcome_hits}✓/${p.outcome_misses}✗${p.last_sync ? " · sync " + esc(p.last_sync) : ""}</div>
             ${p.last_error ? `<div class="meta">${esc(p.last_error)}</div>` : ""}
           </div>`).join("")
         : '<div class="muted" style="font-size:12px">No peers yet. Run a second node and peer it — matching claims become corroboration, new claims enter the chain with federated provenance.</div>') +
@@ -177,11 +177,23 @@ async function refreshFederation() {
 $("#btnAddPeer").addEventListener("click", async () => {
   const url = $("#peerUrl").value.trim();
   if (!url) return;
+  const attempt = async () => fetch("/api/federation/peers", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Api-Key": localStorage.getItem("synthesis_api_key") || "" },
+    body: JSON.stringify({ url }),
+  });
   try {
-    await api("/api/federation/peers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+    let r = await attempt();
+    if (r.status === 401) {                    // auth enforced on this node
+      const key = prompt("This node enforces API keys (§24).\nEnter X-Api-Key for privileged federation routes:");
+      if (!key) return;
+      localStorage.setItem("synthesis_api_key", key);
+      r = await attempt();
+    }
+    if (!r.ok) throw new Error(String(r.status));
     toast("FEDERATION", "Peer registered — first sync attempted.", "info");
     refreshFederation(); refreshEvents();
-  } catch (e) { toast("FEDERATION", "Could not register peer.", "info"); }
+  } catch (e) { toast("FEDERATION", "Could not register peer (" + e.message + ").", "info"); }
 });
 
 /* ---------------- world map ---------------- */
@@ -458,13 +470,25 @@ function drawCalibration(cal) {
 
 /* ---------------- agents ---------------- */
 async function refreshAgents() {
-  const ags = await api("/api/agents");
+  const [ags, sec, audit] = await Promise.all([api("/api/agents"), api("/api/security/status"), api("/api/audit?limit=25")]);
   $("#agentList").innerHTML = ags.map((a) => `
     <div class="agent"><span class="sandbadge">SANDBOXED</span>
       <h3>${esc(a.name)}</h3><div class="scope">${esc(a.scope)}</div>
       <div class="task">▸ ${esc(a.current_task)}</div>
       <div class="perm">read: ${esc(a.permissions.read)} · write: ${esc(a.permissions.write)}<br>cannot: ${a.permissions.cannot.map(esc).join(", ")}</div>
     </div>`).join("");
+  $("#secStatus").innerHTML = `
+    <div style="margin-bottom:8px"><span class="status ${sec.auth_mode === "enforced" ? "RESOLVED" : "PARTIALLY_RESOLVED"}">AUTH: ${esc(sec.auth_mode.toUpperCase())}</span></div>
+    <div style="font-size:12.5px">${esc(sec.note)}</div>
+    <div class="kv"><h4>Rate limits</h4><ul>${Object.entries(sec.rate_limits_per_min).map(([m, v]) => `<li>${m}: ${v}/min per client</li>`).join("")}</ul></div>
+    <div class="kv"><h4>Privileged routes</h4><ul>${sec.privileged_routes.map((r) => `<li><code>${esc(r)}</code></li>`).join("")}</ul></div>
+    <div class="muted" style="font-size:11.5px;font-style:italic">${esc(sec.principle)}</div>`;
+  $("#auditList").innerHTML = audit.entries.map((e) => `
+    <div class="feeditem" style="border-left-color:${e.action.includes("denied") || e.action.includes("limited") ? "#ef4444" : "#1c2a47"}">
+      <span class="src">${esc(e.action)}</span> <span class="meta">${esc(e.at)} · actor ${esc(e.actor)}</span>
+      <div style="font-size:11.5px">${esc(e.object)}${e.detail ? " — " + esc(e.detail) : ""}</div>
+      <span class="meta">hash ${e.hash.slice(0, 12)}…</span>
+    </div>`).join("") || '<span class="muted">no audit entries yet</span>';
 }
 
 /* ---------------- modal ---------------- */

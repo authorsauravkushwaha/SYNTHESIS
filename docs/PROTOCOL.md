@@ -96,24 +96,29 @@ No consensus, no global ordering, no shared database. Nodes may disagree —
 disagreement between nodes is *information* and can surface as contradiction
 objects, exactly like disagreeing sources.
 
-## 6. Learned peer trust (v0.2 — implemented)
+## 6. Learned peer trust (v0.3 — implemented)
 
 Trust is earned from behavior, never asserted:
 
 ```
-trust = (1 + corroborated) / (2 + corroborated + rejected)     # Beta posterior mean
+succ = corroborated + 2 × outcome_hits
+fail = rejected     + 2 × outcome_misses
+trust = (1 + succ) / (2 + succ + fail)          # Beta posterior mean
 import_discount = min(0.98, 0.65 + 0.6 × trust)
 ```
 
-Corroborations are successes, rejections (bad signatures, malformed items)
-are failures, novel imports stay neutral until the outcome ledger can score
-them (v0.3). A neutral peer's imports are discounted ×0.95; a hostile peer
-decays toward ×0.65; a consistently corroborated peer caps at ×0.98 —
-federated evidence can never quite reach first-hand reliability.
+Corroborations are successes; rejections (bad signatures, malformed items)
+are failures; and **forecast outcomes weigh double** — when a forecast
+resolves, every federated evidence record its hypothesis cited is repriced:
+peers whose observations back CORRECT forecasts gain trust, peers whose
+observations keep backing FAILED forecasts lose it, mechanically. Reality is
+the strongest reviewer.
+
+A neutral peer's imports are discounted ×0.95; a hostile peer decays toward
+×0.65; a consistently corroborated peer caps at ×0.98 — federated evidence
+can never quite reach first-hand reliability.
 
 ## 7. Roadmap
 
-- v0.3: peer trust fed by the **outcome ledger** — a node whose observations
-  keep being falsified loses weight, mechanically
 - v0.4: bundle pagination + since-cursor; per-observation origin signatures
 - v0.5: exchange of hypotheses/forecasts/outcomes under the same envelope

@@ -153,6 +153,17 @@
       <div class="panel-title">MULTI-AGENT ROSTER <span class="sub">least-privilege, sandboxed, proposals-only — no agent rewrites authoritative state</span></div>
       <div id="agentList" class="agentgrid"></div>
     </div>
+    <div class="grid-event2">
+      <div class="panel">
+        <div class="panel-title">SECURITY POSTURE <span class="sub">§24 — honestly reported, never silently insecure</span></div>
+        <div id="secStatus" class="muted">loading…</div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">AUDIT TRAIL <span class="sub">hash-chained — verify with the same C tool as evidence</span></div>
+        <div id="auditList" class="feed" style="max-height:280px"></div>
+        <a class="btn ghost" href="/api/audit/export" target="_blank" style="margin-top:8px;display:inline-block">Export audit chain (TSV)</a>
+      </div>
+    </div>
   </section>
 </main>
 

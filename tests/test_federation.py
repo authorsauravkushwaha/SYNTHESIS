@@ -75,6 +75,31 @@ def test_corroboration_earns_trust():
     assert peer.import_discount() <= 0.98                     # but capped
 
 
+def test_outcome_ledger_reprices_peer_trust():
+    """Protocol v0.3: reality is the strongest reviewer."""
+    n = make_node()
+    peer = PeerState(url="http://peer.example", node_id="feedbeef1234")
+    n.peers[peer.url] = peer
+    peer.corroborated = 4
+    peer.learn_trust()
+    before = peer.trust
+    # forge a federated evidence record cited by a hypothesis whose forecast fails
+    from server.world import WORLD
+    WORLD.obs_counter += 1
+    eid = f"obs_{WORLD.obs_counter}"
+    WORLD._evidence(eid, "peer radar", "sensor", 0.8, "unique-claim-xyz",
+                    "maritime", independence="federated:feedbeef1234")
+    for _ in range(3):
+        n._on_outcome([eid], correct=False)
+    assert peer.outcome_misses == 3
+    assert peer.trust < before               # falsified outcomes cost trust
+    n._on_outcome([eid], correct=True)
+    assert peer.outcome_hits == 1            # and correct ones restore it
+    # outcomes weigh double vs corroborations in the posterior
+    succ, fail = peer.corroborated + 2 * 1, 2 * 3
+    assert peer.trust == round((1 + succ) / (2 + succ + fail), 3)
+
+
 def test_matching_claims_become_corroboration_not_duplicates():
     a = make_node()
     bundle = a.outbound_bundle()
