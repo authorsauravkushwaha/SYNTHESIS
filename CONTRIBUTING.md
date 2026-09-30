@@ -31,7 +31,7 @@ there is no generic "bug report". Instead:
 ```bash
 pip install -r requirements.txt pytest
 uvicorn server.main:app --host 0.0.0.0 --port 8000   # app
-python -m pytest tests/ -q                           # 21 invariants
+python -m pytest tests/ -q                           # the invariant suite
 ./scripts/verify_chain.sh                            # C verifier vs live chain
 ```
 

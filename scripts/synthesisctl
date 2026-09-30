@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""
+synthesisctl — the SYNTHESIS ops-center for your terminal.
+Pure Python stdlib, zero dependencies, works over SSH on a potato.
+
+  synthesisctl status                     global state
+  synthesisctl events                     active cross-domain events
+  synthesisctl cone <event_id>            impact cone as a causal tree
+  synthesisctl hyps <event_id>            competing hypotheses
+  synthesisctl challenge <hyp_id>         unleash the Adversarial Agent
+  synthesisctl ledger                     outcome ledger + calibration
+  synthesisctl fed                        federation status
+  synthesisctl verify                     re-verify the evidence chain locally
+  synthesisctl watch                      live dashboard (refreshes every 5 s)
+
+  SYNTHESIS_URL=http://host:8000 synthesisctl status
+"""
+import hashlib
+import json
+import os
+import sys
+import time
+import urllib.request
+
+BASE = os.environ.get("SYNTHESIS_URL", "http://localhost:8000").rstrip("/")
+
+# ---- ANSI palette (the web UI's colors, in escape codes) --------------------
+R = "\033[0m"; B = "\033[1m"; DIM = "\033[2m"
+CYAN = "\033[38;5;44m"; TEAL = "\033[38;5;42m"; BLUE = "\033[38;5;117m"
+AMBER = "\033[38;5;220m"; ORANGE = "\033[38;5;208m"; RED = "\033[38;5;196m"
+MUT = "\033[38;5;103m"
+EDGE_COLOR = {"observed": TEAL, "strongly_supported": BLUE, "plausible": AMBER,
+              "uncertain": ORANGE, "contradicted": RED, "unknown": MUT}
+SEV = {"high": RED + "●" + R, "medium": AMBER + "●" + R, "low": TEAL + "●" + R}
+
+
+def get(path):
+    with urllib.request.urlopen(BASE + path, timeout=10) as r:
+        return json.loads(r.read())
+
+
+def post(path, body=None):
+    req = urllib.request.Request(BASE + path, data=json.dumps(body or {}).encode(),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return json.loads(r.read())
+
+
+def hdr(text):
+    print(f"\n{CYAN}{B}▐ {text}{R}")
+
+
+def cmd_status():
+    s = get("/api/state")
+    hdr("SYNTHESIS · GLOBAL STATE")
+    rows = [("Active observations", f"{s['active_observations']:,}"),
+            ("Cross-domain events", s["cross_domain_events"]),
+            ("Active hypotheses", s["active_hypotheses"]),
+            ("Forecasts under observation", s["forecasts_open"]),
+            ("Unresolved contradictions", s["unresolved_contradictions"]),
+            ("Model calibration", f"{s['model_calibration_pct']}%"),
+            ("Mean Brier score", s["mean_brier"]),
+            ("Evidence chain", f"#{s['chain_length']} · {s['chain_head'][:16]}…")]
+    for k, v in rows:
+        print(f"  {MUT}{k:<30}{R}{B}{v}{R}")
+
+
+def cmd_events():
+    hdr("ACTIVE CROSS-DOMAIN EVENTS")
+    for ev in get("/api/events"):
+        print(f"  {SEV.get(ev['severity'], '·')} {B}{ev['id']}{R}  {ev['title']}")
+        print(f"     {MUT}{ev['domain']} · {ev['location']} · detected {ev['detected_at']}{R}")
+
+
+def cmd_cone(event_id):
+    cone = get(f"/api/events/{event_id}/cone")
+    hdr(f"IMPACT CONE · {event_id}")
+    nodes = {n["id"]: n for n in cone["nodes"]}
+    for e in cone["edges"]:
+        c = EDGE_COLOR.get(e["status"], MUT)
+        src = nodes[e["source"]]["label"].replace("\n", " ")
+        dst = nodes[e["target"]]["label"].replace("\n", " ")
+        print(f"  {src:<28} {c}──[{e['status']} {e['confidence']}]──▶{R} {dst}")
+        print(f"    {DIM}{e['mechanism']}{' · lag ' + e['lag'] if e['lag'] else ''}{R}")
+
+
+def cmd_hyps(event_id):
+    hdr(f"COMPETING HYPOTHESES · {event_id}")
+    for h in get(f"/api/events/{event_id}/hypotheses"):
+        bar = "█" * int(h["confidence"] * 20)
+        print(f"  {AMBER}{B}[{h['label']}]{R} {h['id']}  {TEAL}{bar}{R} {int(h['confidence']*100)}%")
+        print(f"      {h['claim']}")
+        print(f"      {MUT}falsifiers: {' | '.join(h['falsifiers'])[:110]}{R}")
+
+
+def cmd_challenge(hyp_id):
+    r = post(f"/api/hypotheses/{hyp_id}/challenge")
+    hdr(f"ADVERSARIAL AGENT · {hyp_id}")
+    for f in r["findings"]:
+        c = {"high": RED, "medium": AMBER, "low": MUT}.get(f["severity"], MUT)
+        print(f"  {c}▸ [{f['severity']}] {f['type']}{R}\n    {f['note']}")
+    print(f"\n  {B}{r['verdict']}{R}")
+    print(f"  stated {int(r['stated_confidence']*100)}% → adversarial-adjusted "
+          f"{B}{int(r['adversarial_adjusted_confidence']*100)}%{R}")
+
+
+def cmd_ledger():
+    led, cal = get("/api/ledger"), get("/api/calibration")
+    hdr("OUTCOME LEDGER")
+    for f in led["resolved_forecasts"]:
+        tag = (TEAL + "✓ " + f["outcome"]["verdict"]) if f["status"] == "correct" \
+              else (RED + "✗ " + f["outcome"]["verdict"])
+        print(f"  {f['id']}  p={f['probability']}  {tag}{R}\n    {f['prediction']}")
+    for f in led["open_forecasts"]:
+        print(f"  {f['id']}  p={f['probability']}  {ORANGE}⏱ open (window {f['forecast_window']}){R}")
+    print(f"\n  {MUT}calibration: {cal['total_resolved']} resolved · "
+          f"hit {cal['overall_hit_rate']*100:.1f}% · Brier {cal['mean_brier']}{R}")
+
+
+def cmd_fed():
+    f = get("/api/federation/status")
+    ident = f["identity"]
+    hdr("FEDERATION · SYNTHESIS PROTOCOL v0")
+    print(f"  this node: {B}{ident['name']}{R} · id {ident['node_id']}")
+    for p in f["peers"]:
+        ok = TEAL + "sig ✓" + R if p["reachable"] else RED + "unreachable" + R
+        print(f"  ⇄ {B}{p['name'] or p['url']}{R} ({p['node_id']}) {ok} · "
+              f"trust {p['trust']} · new {p['imported_new']} · corroborated {p['corroborated']} "
+              f"· rejected {p['rejected']}")
+    if not f["peers"]:
+        print(f"  {MUT}no peers — POST /api/federation/peers to connect a node{R}")
+
+
+def cmd_verify():
+    hdr("EVIDENCE CHAIN · LOCAL RE-VERIFICATION")
+    with urllib.request.urlopen(BASE + "/api/ledger/export", timeout=10) as r:
+        lines = r.read().decode().strip().split("\n")[1:]
+    prev = "0" * 64
+    for i, line in enumerate(lines):
+        _, prev_hash, stored, payload = line.split("\t", 3)
+        if prev_hash != prev or \
+           hashlib.sha256(f"{prev_hash}|{payload}".encode()).hexdigest() != stored:
+            print(f"  {RED}✗ TAMPERED at seq {i}{R}"); sys.exit(1)
+        prev = stored
+    print(f"  {TEAL}✓ chain VALID{R} — {len(lines)} records, head {prev[:20]}…")
+
+
+def cmd_watch():
+    try:
+        while True:
+            print("\033[2J\033[H", end="")
+            print(f"{CYAN}{B}  S Y N T H E S I S {R}{MUT}  ops terminal · {BASE} · "
+                  f"{time.strftime('%H:%M:%S')} · ^C to exit{R}")
+            cmd_status(); cmd_events()
+            feed = get("/api/feed?limit=5")
+            hdr("LIVE EVIDENCE")
+            for r_ in feed:
+                print(f"  {MUT}{r_['observed_at']}{R} {CYAN}{r_['source']}{R} {r_['statement'][:90]}")
+            time.sleep(5)
+    except KeyboardInterrupt:
+        print()
+
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        print(__doc__); return
+    cmd, rest = args[0], args[1:]
+    table = {"status": cmd_status, "events": cmd_events, "ledger": cmd_ledger,
+             "fed": cmd_fed, "verify": cmd_verify, "watch": cmd_watch}
+    if cmd in table:
+        table[cmd]()
+    elif cmd == "cone" and rest:
+        cmd_cone(rest[0])
+    elif cmd == "hyps" and rest:
+        cmd_hyps(rest[0])
+    elif cmd == "challenge" and rest:
+        cmd_challenge(rest[0])
+    else:
+        print(__doc__)
+
+
+if __name__ == "__main__":
+    main()

@@ -141,8 +141,12 @@ part — *federation as epistemology, not sync*:
 - a peer's claim that **matches** local evidence becomes independent
   **corroboration** (marked `corroborated_by:<node_id>`), never a duplicate;
 - a peer's **new** claim enters the local tamper-evident chain with
-  `federated:<node_id>` provenance and reliability discounted ×0.95
-  (transitive trust decays);
+  `federated:<node_id>` provenance;
+- **peer trust is learned, never asserted**: a Laplace-smoothed Beta
+  posterior over corroborations (successes) and rejections (failures) sets
+  the reliability discount for that peer's future imports — a peer that
+  keeps sending unverifiable bundles decays toward ×0.65, a consistently
+  corroborated peer caps at ×0.98;
 - rejected bundles/items are counted and reported — failure is visible.
 
 Try it in two terminals:
@@ -157,6 +161,30 @@ curl -X POST localhost:8000/api/federation/peers \
 
 …or paste the peer URL into the **FEDERATION** panel in the UI. Full wire
 format: **[docs/PROTOCOL.md](docs/PROTOCOL.md)**.
+
+## `synthesisctl` — the ops-center in your terminal
+
+Zero dependencies, pure stdlib, works over SSH:
+
+```bash
+scripts/synthesisctl status              # global state
+scripts/synthesisctl watch               # live dashboard, refreshes every 5 s
+scripts/synthesisctl cone evt_3101       # impact cone as a colored causal tree
+scripts/synthesisctl challenge hyp_442   # unleash the Adversarial Agent
+scripts/synthesisctl fed                 # federation peers + learned trust
+scripts/synthesisctl verify              # re-verify the evidence chain locally
+SYNTHESIS_URL=https://your-node synthesisctl ledger
+```
+
+## Signed releases (§21–22)
+
+Tagging `v*` triggers `.github/workflows/release.yml`: the invariant suite
+and cross-language chain verification must pass **before anything is
+signed**; then the container is pushed to GHCR with a BuildKit provenance
+attestation, an SPDX **SBOM** is generated (syft), and the image digest is
+**keyless-signed with Sigstore cosign** (short-lived identity-bound cert,
+recorded in the Rekor transparency log). Release notes ship with the
+`cosign verify` command — verify before you trust, like everything else here.
 
 ## Free to run — everywhere
 

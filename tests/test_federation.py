@@ -52,6 +52,29 @@ def test_unsigned_content_never_ingested():
     assert peer.rejected == 1 and len(n._imported) == before
 
 
+def test_trust_is_learned_not_asserted():
+    n = make_node()
+    peer = PeerState(url="http://peer.example")
+    assert peer.trust == 0.5                                  # neutral prior
+    # a peer that keeps sending unverifiable bundles loses trust…
+    evil = n.outbound_bundle()
+    evil["signature"] = "00" * 64
+    for _ in range(4):
+        n.ingest_bundle(evil, peer)
+    assert peer.trust < 0.25
+    # …and its future imports would be discounted harder
+    assert peer.import_discount() < 0.85
+
+
+def test_corroboration_earns_trust():
+    good, receiver = make_node(), make_node()
+    peer = PeerState(url="http://good.example")
+    receiver.ingest_bundle(good.outbound_bundle(), peer)
+    assert peer.corroborated > 0
+    assert peer.trust > 0.5                                   # earned upward
+    assert peer.import_discount() <= 0.98                     # but capped
+
+
 def test_matching_claims_become_corroboration_not_duplicates():
     a = make_node()
     bundle = a.outbound_bundle()

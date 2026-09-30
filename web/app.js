@@ -167,7 +167,7 @@ async function refreshFederation() {
       (f.peers.length
         ? f.peers.map((p) => `<div class="fedpeer ${p.reachable === false ? "down" : ""}">
             <b>${esc(p.name || p.url)}</b> ${p.node_id ? `<span class="meta">id ${esc(p.node_id)}</span>` : ""}
-            <div class="meta">${p.reachable === false ? "unreachable" : "signature verified ✓"} · imported ${p.imported_new} · corroborated ${p.corroborated} · rejected ${p.rejected}${p.last_sync ? " · sync " + esc(p.last_sync) : ""}</div>
+            <div class="meta">${p.reachable === false ? "unreachable" : "signature verified ✓"} · trust ${p.trust} (learned) · imported ${p.imported_new} · corroborated ${p.corroborated} · rejected ${p.rejected}${p.last_sync ? " · sync " + esc(p.last_sync) : ""}</div>
             ${p.last_error ? `<div class="meta">${esc(p.last_error)}</div>` : ""}
           </div>`).join("")
         : '<div class="muted" style="font-size:12px">No peers yet. Run a second node and peer it — matching claims become corroboration, new claims enter the chain with federated provenance.</div>') +

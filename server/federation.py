@@ -106,7 +106,21 @@ class PeerState:
     imported_new: int = 0
     corroborated: int = 0
     rejected: int = 0
+    trust: float = 0.5          # learned — Beta-posterior mean, never asserted
     last_error: str | None = None
+
+    def learn_trust(self) -> None:
+        """Trust is earned from behavior, not claimed (protocol v0.2 preview):
+        Laplace-smoothed Beta posterior — corroborations are successes,
+        rejections are failures, novel imports are neutral until the outcome
+        ledger can score them (v0.3)."""
+        self.trust = round((1 + self.corroborated) / (2 + self.corroborated + self.rejected), 3)
+
+    def import_discount(self) -> float:
+        """Reliability multiplier for evidence imported from this peer.
+        Neutral peer (trust 0.5) → ×0.95; perfect history caps at ×0.98;
+        a peer that mostly sends garbage decays toward ×0.65."""
+        return min(0.98, 0.65 + 0.6 * self.trust)
 
 
 class FederationNode:
@@ -161,6 +175,7 @@ class FederationNode:
         if not ok:
             peer.rejected += 1
             peer.last_error = f"bundle rejected: {reason}"
+            peer.learn_trust()
             return
         node = bundle["node"]
         peer.node_id, peer.name = node["node_id"], _clean_text(node["name"], 40)
@@ -189,9 +204,11 @@ class FederationNode:
                 WORLD.obs_counter += 1
                 eid = f"obs_{WORLD.obs_counter}"
                 WORLD._evidence(
-                    eid, f"{src} ⇄ {peer.name}", stype, round(rel * 0.95, 2),
+                    eid, f"{src} ⇄ {peer.name}", stype,
+                    round(rel * peer.import_discount(), 2),
                     stmt, domain, independence=f"federated:{peer.node_id}")
                 peer.imported_new += 1
+        peer.learn_trust()
 
     # -- peer management --------------------------------------------------------
     def add_peer(self, url: str) -> PeerState:
@@ -231,7 +248,8 @@ class FederationNode:
             "principle": ("Federation is epistemology, not sync: matching claims from "
                           "independent nodes become corroboration; new claims enter the "
                           "local evidence chain with federated provenance; every bundle "
-                          "is signature-verified before its content is read as data."),
+                          "is signature-verified before its content is read as data; "
+                          "peer trust is learned from behavior, never asserted."),
         }
 
     async def run(self) -> None:
