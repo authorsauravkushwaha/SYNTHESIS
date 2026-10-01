@@ -31,8 +31,11 @@ Especially interesting classes of report:
 
 Implemented and in scope for reports: rate limiting (token buckets → 429),
 API-key auth on privileged routes (`SYNTHESIS_ADMIN_KEY`, constant-time
-compare, honest mode reporting), and the hash-chained audit trail
-(`/api/audit/export`, verifiable with `tools/ledgercheck`). Still documented
-targets: full RBAC, per-user identities, secret rotation (vision §18–§20) —
-PRs that turn those sections into working code are as valuable as
+compare, honest mode reporting), RBAC roles (admin / analyst / viewer via
+`SYNTHESIS_ANALYST_KEY`; analyst gate arms only once a key exists), runtime
+key rotation (`POST /api/security/rotate`, admin-only, old key invalid
+immediately, keys never enter the audit chain), and the hash-chained audit
+trail (`/api/audit/export`, verifiable with `tools/ledgercheck`). Still
+documented targets: per-user identities and external secret stores (vision
+§18–§20) — PRs that turn those sections into working code are as valuable as
 vulnerability reports.

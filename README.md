@@ -259,7 +259,8 @@ ingest payloads (including prompt-injection text) neutralized to inert data.
 | §43 Federation | ✅ protocol v0: signed bundles, learned trust (v0.3), cross-node review (v0.5) |
 | §44 SDK / adapters / schemas | ✅ Python + TypeScript SDKs, adapter API, SQL schema |
 | §45 Ethical boundary | ✅ decision support only; no autonomous actions anywhere |
-| LLM-backed extraction/forecasting agents, RBAC, PostGIS persistence | 🔜 next phase (schema & interfaces ready) |
+| §24 RBAC (admin/analyst/viewer) + runtime key rotation | ✅ |
+| LLM-backed extraction/forecasting agents, PostGIS persistence | 🔜 next phase (schema & interfaces ready) |
 
 ## Tamper-evident analytical history (§21, §42)
 

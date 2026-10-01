@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.1.1 — website + RBAC
+
+- **GitHub Pages website**: the console deploys to
+  `https://authorsauravkushwaha.github.io/SYNTHESIS/` on every push to main.
+  The build boots two real peered nodes, evolves the world 150 s and freezes
+  the state — static mode is a genuine engine snapshot, with counterfactual
+  branching ported client-side and the PWA installable straight from Pages.
+- **RBAC + key rotation (§24 complete)**: admin / analyst / viewer roles;
+  analysis routes (challenge, counterfactual) gate on an analyst-or-admin key
+  once `SYNTHESIS_ANALYST_KEY` is set; `POST /api/security/rotate` mints or
+  rotates role keys at runtime (admin-only, old key invalid immediately,
+  keys never written to the audit chain). 47-test suite.
+
 ## v0.1.0 — the complete vertical slice
 
 The full intelligence loop from the vision document, running end to end:

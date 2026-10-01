@@ -52,8 +52,17 @@ async def security_headers(request, call_next):
         if request.method == "POST" and path.startswith(security.PRIVILEGED_PREFIXES):
             if not security.check_key(request.headers.get("x-api-key", "")):
                 security.AUDIT.record(client, "auth_denied", path)
-                return JSONResponse({"detail": "invalid or missing X-Api-Key"}, status_code=401)
+                return JSONResponse({"detail": "invalid or missing X-Api-Key"},
+                                    status_code=401)
             security.AUDIT.record(client, "privileged_call", path)
+        # 3. RBAC analyst gate (§24) — enforced once an analyst key exists
+        elif request.method == "POST" and path.startswith(security.ANALYST_PREFIXES):
+            if not security.analyst_allowed(request.headers.get("x-api-key", "")):
+                security.AUDIT.record(client, "auth_denied", path, "analyst role required")
+                return JSONResponse(
+                    {"detail": "analyst or admin X-Api-Key required for analysis routes"},
+                    status_code=401)
+            security.AUDIT.record(client, "analysis_call", path)
         elif request.method == "POST":
             security.AUDIT.record(client, "analysis_call", path)
     resp = await call_next(request)
@@ -286,6 +295,27 @@ def healthz():
 @app.get("/api/security/status")
 def security_status():
     return security.status()
+
+
+class RotateRequest(BaseModel):
+    role: str = Field(pattern="^(admin|analyst)$")
+
+
+@app.post("/api/security/rotate")
+def security_rotate(req: RotateRequest):
+    """Rotate (or first-mint) a role key. Admin-only — the middleware already
+    required a valid admin X-Api-Key to reach this handler. The new key is
+    returned exactly once and never enters the audit chain."""
+    try:
+        new_key = security.rotate(req.role)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    return {
+        "role": req.role,
+        "new_key": new_key,
+        "note": ("Store it now — it is not retrievable again. The previous key "
+                 "is already invalid. A restart reverts to the environment keys."),
+    }
 
 
 @app.get("/api/audit")

@@ -37,10 +37,11 @@ jobs:
       - name: Build static snapshot (two peered nodes, full-fidelity wait)
         run: python scripts/build_pages.py
 
-      - name: Configure GitHub Pages (auto-enables on first run)
+      # NOTE: Pages must be enabled once in the repo UI:
+      #   Settings → Pages → Build and deployment → Source: "GitHub Actions"
+      # (auto-enablement via the API is not permitted for the default token)
+      - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:

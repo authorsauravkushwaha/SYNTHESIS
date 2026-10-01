@@ -38,6 +38,24 @@ function enterStaticMode() {
       `Streams, federation actions and adversarial challenges need a live node — see the README quick start. Everything you see was produced by the real engine.</div>`);
   }).catch(() => {});
 }
+/* analysis POSTs (challenge, counterfactual) — RBAC-aware: sends the stored
+   X-Api-Key; on 401 (analyst gate, §24) prompts once and retries */
+async function authedPost(path, body) {
+  if (STATIC_MODE) return api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
+  const attempt = () => fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Api-Key": localStorage.getItem("synthesis_api_key") || "" },
+    body: JSON.stringify(body ?? {}),
+  });
+  let r = await attempt();
+  if (r.status === 401) {
+    const key = prompt("This node enforces RBAC (§24).\nEnter an analyst or admin X-Api-Key for analysis routes:");
+    if (key) { localStorage.setItem("synthesis_api_key", key); r = await attempt(); }
+  }
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+
 /* client-side port of World.counterfactual() — same math, same narrative */
 async function localCounterfactual({ event_id, duration_hours: d, recovery }) {
   const [cone, ev] = await Promise.all([api(`/api/events/${event_id}/cone`), api("/api/events/" + event_id)]);
@@ -444,7 +462,12 @@ $("#btnChallenge").addEventListener("click", async () => {
     return;
   }
   $("#advOut").innerHTML = `<span class="muted">Adversarial Agent attacking hypothesis…</span>`;
-  const r = await api(`/api/hypotheses/${selectedHyp}/challenge`, { method: "POST" });
+  let r;
+  try { r = await authedPost(`/api/hypotheses/${selectedHyp}/challenge`); }
+  catch (e) {
+    $("#advOut").innerHTML = `<div class="finding medium"><span class="ftype">ACCESS DENIED</span><div>Analysis routes on this node require an analyst or admin key (RBAC §24).</div></div>`;
+    return;
+  }
   $("#advOut").innerHTML =
     r.findings.map((f) => `<div class="finding ${f.severity}"><span class="ftype">${esc(f.type)} · ${esc(f.severity)}</span><div>${esc(f.note)}</div></div>`).join("") +
     `<div class="verdict ${r.adversarial_adjusted_confidence <= 0.45 ? "weak" : ""}">
@@ -466,11 +489,11 @@ $("#cfDuration").addEventListener("input", () => {
 });
 $("#btnBranch").addEventListener("click", async () => {
   if (!selectedEvent) return;
-  const branch = await api("/api/counterfactual", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ event_id: selectedEvent, duration_hours: +$("#cfDuration").value, recovery: $("#cfRecovery").value }),
-  });
-  renderCone(selectedEvent, branch);
+  try {
+    const branch = await authedPost("/api/counterfactual",
+      { event_id: selectedEvent, duration_hours: +$("#cfDuration").value, recovery: $("#cfRecovery").value });
+    renderCone(selectedEvent, branch);
+  } catch (e) { toast("RBAC", "Counterfactual needs an analyst or admin key on this node.", "info"); }
 });
 $("#btnBaseline").addEventListener("click", () => selectedEvent && renderCone(selectedEvent));
 
